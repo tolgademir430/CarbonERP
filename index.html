@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CarbonERP V12 - Yönetici Dashboard</title>
+<title>CarbonERP V13 - Mobil ve Belgeler</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f5f6f8;color:#20252b}
 header{height:64px;background:#20252b;color:#fff;display:flex;align-items:center;padding:0 24px;justify-content:space-between}.logo{font-size:22px;font-weight:700}
@@ -14,6 +14,43 @@ input,select{width:100%;padding:11px;border:1px solid #cfd4d9;border-radius:8px;
 table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #eee}th{color:#68717a;font-size:12px}.empty{text-align:center;color:#68717a;padding:30px}.toolbar{display:flex;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}.modal{position:fixed;inset:0;background:#0006;display:none;align-items:center;justify-content:center;padding:20px}.modal.open{display:flex}.modalbox{background:#fff;border-radius:14px;padding:22px;max-width:700px;width:100%;max-height:90vh;overflow:auto}
 #login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.loginbox{background:#fff;border:1px solid #ddd;border-radius:16px;padding:28px;width:min(420px,100%);box-shadow:0 8px 30px #00000012}.loginbox h1{margin-bottom:20px}.loginbox .field{margin-bottom:14px}.status{font-size:12px;color:#68717a;margin-top:10px}
 @media(max-width:850px){.cards{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.formgrid{grid-template-columns:1fr}}
+</style>
+
+<style id="carbonerp-mobile-v13">
+@media (max-width: 900px){
+  body{font-size:15px}
+  .sidebar{width:72px}
+  .sidebar .brand span,.sidebar .nav-label,.sidebar .user-name{display:none}
+  .main{margin-left:72px}
+  .cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .grid{grid-template-columns:1fr}
+  .panel{overflow-x:auto}
+  table{min-width:650px}
+  .topbar{padding:10px 14px}
+  .content{padding:14px}
+  button,.btn,input,select,textarea{min-height:42px}
+}
+@media (max-width:600px){
+  .sidebar{position:fixed;left:0;bottom:0;top:auto;width:100%;height:64px;z-index:1000;display:flex;justify-content:space-around;padding:4px}
+  .sidebar .nav{display:flex;overflow-x:auto;width:100%;gap:4px}
+  .sidebar .nav a,.sidebar .nav button{flex:1;min-width:72px;padding:7px 4px;text-align:center;font-size:11px}
+  .main{margin-left:0;margin-bottom:64px}
+  .cards{grid-template-columns:1fr 1fr}
+  .card{padding:12px}
+  .card .value{font-size:19px}
+  h1{font-size:23px}
+  h2{font-size:18px}
+  .field-grid,.form-grid{grid-template-columns:1fr!important}
+  .modal{width:96vw!important;max-height:90vh;overflow:auto}
+  .actions{display:flex;flex-wrap:wrap;gap:6px}
+}
+@media print{
+  .sidebar,.topbar,.no-print,button,.btn{display:none!important}
+  .main{margin:0!important}
+  .content{padding:0!important}
+  .panel{box-shadow:none;border:1px solid #ddd;break-inside:avoid}
+  body{background:#fff}
+}
 </style>
 </head>
 <body>
@@ -121,6 +158,17 @@ function monthlySummaryTable(){
     rows.map(x=>`<tr><td>${x.k}</td><td>${money(x.sales)}</td><td>${money(x.cost)}</td><td class="${x.profit>=0?'positive':'danger'}">${money(x.profit)}</td><td>%${x.margin.toFixed(1)}</td><td>${x.kg.toLocaleString('tr-TR')}</td></tr>`).join('')
   }</table>`;
 }
+
+function printCustomerStatement(customerId){
+  const c=(data.customers||[]).find(x=>x.id===customerId);
+  if(!c){alert('Müşteri bulunamadı');return;}
+  const sales=(data.sales||[]).filter(x=>x.customer_id===customerId);
+  const rows=sales.map(s=>`<tr><td>${esc(s.sale_date||'')}</td><td>Satış</td><td>${esc(s.invoice_no||s.id||'')}</td><td>${money(s.total||0)}</td><td>${money(saleOutstanding(s))}</td></tr>`).join('');
+  const w=window.open('','_blank');
+  if(!w)return;
+  w.document.write(`<html><head><title>Cari Ekstre - ${esc(c.name||'')}</title><style>body{font-family:Arial;padding:30px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}h1{margin-bottom:4px}.total{margin-top:20px;font-size:20px;font-weight:bold}</style></head><body><h1>CarbonERP - Cari Ekstre</h1><div><b>Müşteri:</b> ${esc(c.name||'')}</div><table><tr><th>Tarih</th><th>İşlem</th><th>Belge</th><th>İşlem Tutarı</th><th>Kalan</th></tr>${rows||'<tr><td colspan="5">Kayıt yok</td></tr>'}</table><div class="total">Toplam Açık Bakiye: ${money(sales.reduce((a,s)=>a+saleOutstanding(s),0))}</div><script>window.onload=()=>window.print()<\/script></body></html>`);
+  w.document.close();
+}
 function dashboard(){
   let ds=data.sales.filter(s=>s.sale_date===today());
   let de=data.expenses.filter(e=>e.expense_date===today());
@@ -172,7 +220,7 @@ function previewSale(){
 async function saveSale(){try{if(!data.customers.length)return alert('Önce müşteri ekleyin.');let q=+s_kg.value,p=+s_price.value;if(!(q>0&&p>=0))return alert('Kg ve fiyatı kontrol edin.');if(q>data.stockQty)return alert('Yeterli stok yok.');let payment=s_payment.value,due=s_due?.value||null;if(payment==='Vadeli'&&!due)return alert('Vade tarihi girin.');
 let base=q*p,vatRate=+s_vat.value||0,vatAmount=base*vatRate/100,total=base+vatAmount,cost=q*weightedCost();
 let {data:sale,error}=await client.from('sales').insert({customer_id:s_customer.value,warehouse_id:warehouse.id,sale_date:s_date.value,payment_type:payment,due_date:due,subtotal:base,vat_rate:vatRate,vat_amount:vatAmount,total:total,cost_total:cost,created_by:currentUser.id}).select().single();if(error)throw error;let {error:e1}=await client.from('sale_items').insert({sale_id:sale.id,product_id:product.id,quantity:q,unit_price:p,vat_rate:vatRate,line_total:base+vatAmount,unit_cost:weightedCost(),cost_total:cost});if(e1)throw e1;let {error:e2}=await client.from('stock_movements').insert({warehouse_id:warehouse.id,product_id:product.id,movement_date:s_date.value,movement_type:'sale',quantity:-q,unit_cost:weightedCost(),total_cost:-cost,reference_id:sale.id});if(e2)throw e2;if(payment!=='Vadeli'){let {error:e3}=await client.from('collections').insert({customer_id:s_customer.value,sale_id:sale.id,collection_date:s_date.value,payment_type:payment==='Peşin'?'Peşin':payment,amount:total,created_by:currentUser.id});if(e3)throw e3}await loadData();alert('Satış buluta kaydedildi.');show('dashboard')}catch(e){alert(msg(e))}}
-function customers(){return `<section><h1>Müşteriler</h1><div class="sub">Cari hesaplar bulutta tutuluyor.</div><div class="panel"><div class="toolbar"><button class="btn primary" onclick="openCustomer()">+ Müşteri Ekle</button></div>${customerTable()}</div></section>`}
+function customers(){return `<section><h1>Müşteriler</h1><div class="actions no-print"><button onclick="window.print()">🖨️ Yazdır</button></div><div class="sub">Cari hesaplar bulutta tutuluyor.</div><div class="panel"><div class="toolbar"><button class="btn primary" onclick="openCustomer()">+ Müşteri Ekle</button></div>${customerTable()}</div></section>`}
 function customerTable(){if(!data.customers.length)return '<div class="empty">Henüz müşteri yok.</div>';return `<table><tr><th>Müşteri</th><th>Telefon</th><th>Satış</th><th>Tahsilat</th><th>Bakiye</th><th></th></tr>${data.customers.map(c=>{let s=data.sales.filter(x=>x.customer_id===c.id).reduce((a,x)=>a+Number(x.total),0),p=data.collections.filter(x=>x.customer_id===c.id).reduce((a,x)=>a+Number(x.amount),0);return `<tr><td>${esc(c.name)}</td><td>${esc(c.phone)}</td><td>${money(s)}</td><td>${money(p)}</td><td class="${s-p>0?'warning':'positive'}">${money(s-p)}</td><td><button class="btn secondary" onclick="customerDetail('${c.id}')">Ekstre</button></td></tr>`}).join('')}</table>`}
 function openCustomer(){modalbox.innerHTML=`<h2>Yeni Müşteri</h2><div class="formgrid"><div class="field"><label>Ad</label><input id="c_name"></div><div class="field"><label>Telefon</label><input id="c_phone"></div><div class="field"><label>Adres</label><input id="c_addr"></div><div class="field"><label>Vergi No</label><input id="c_tax"></div></div><div class="actions"><button class="btn secondary" onclick="closeModal()">İptal</button><button class="btn primary" onclick="addCustomer()">Kaydet</button></div>`;modal.classList.add('open')}
 async function addCustomer(){try{let n=c_name.value.trim();if(!n)return alert('Müşteri adı zorunlu.');let {error}=await client.from('customers').insert({name:n,phone:c_phone.value,address:c_addr.value,tax_number:c_tax.value});if(error)throw error;await loadData();closeModal();show('customers')}catch(e){alert(msg(e))}}
@@ -201,7 +249,7 @@ let {data:pur,error}=await client.from('purchases').insert({warehouse_id:warehou
 function expenses(){return `<section><h1>Giderler</h1><div class="sub">İşletme giderleri net kâra yansır.</div><div class="panel"><div class="formgrid"><div class="field"><label>Tarih</label><input id="e_date" type="date" value="${today()}"></div><div class="field"><label>Tür</label><select id="e_type"><option>Yakıt</option><option>Personel</option><option>Kira</option><option>Araç</option><option>Telefon/İnternet</option><option>Depo</option><option>Nakliye</option><option>Banka/POS</option><option>Vergi/Harç</option><option>Pazarlama</option><option>Bakım/Onarım</option><option>Diğer</option></select></div><div class="field"><label>Tutar</label><input id="e_amount" type="number" min="0" step=".01"></div><div class="field"><label>Ödeme Şekli</label><select id="e_method"><option>Nakit</option><option>Havale/EFT</option><option>Kredi Kartı</option><option>Diğer</option></select></div><div class="field"><label>Açıklama</label><input id="e_note"></div></div><div class="actions"><button class="btn primary" onclick="addExpense()">Gideri Kaydet</button></div></div><div class="panel" style="margin-top:18px">${data.expenses.length?`<table><tr><th>Tarih</th><th>Tür</th><th>Açıklama</th><th>Ödeme</th><th>Tutar</th></tr>${data.expenses.slice().reverse().map(e=>`<tr><td>${e.expense_date}</td><td>${esc(e.category)}</td><td>${esc(e.description)}</td><td>${esc(e.payment_type||"")}</td><td>${money(e.amount)}</td></tr>`).join('')}</table>`:'<div class="empty">Henüz gider yok.</div>'}</div></section>`}
 async function addExpense(){try{let a=+e_amount.value;if(!(a>0))return alert('Tutar girin.');let {error}=await client.from('expenses').insert({expense_date:e_date.value,category:e_type.value,description:e_note.value,amount:a,payment_type:e_method.value,created_by:currentUser.id});if(error)throw error;await loadData();show('expenses')}catch(e){alert(msg(e))}}
 function stock(){let rows=data.stockMovements.slice().reverse();return `<section><h1>Stok Hareketleri</h1><div class="sub">Tüm giriş ve çıkışlar Supabase'den okunuyor.</div><div class="cards"><div class="card"><small>Mevcut Stok</small><div class="value">${data.stockQty} kg</div></div><div class="card"><small>Ortalama Maliyet</small><div class="value">${money(weightedCost())}/kg</div></div><div class="card"><small>Stok Değeri</small><div class="value">${money(data.stockCost)}</div></div><div class="card"><small>Hareketli Ortalama Maliyet</small><div class="value">${money(weightedCost())}/kg</div></div><div class="card"><small>Hareket</small><div class="value">${rows.length}</div></div></div><div class="panel"><table><tr><th>Tarih</th><th>İşlem</th><th>Kg</th><th>Maliyet</th></tr>${rows.map(r=>`<tr><td>${r.movement_date}</td><td>${r.movement_type}</td><td class="${r.quantity>0?'positive':'danger'}">${r.quantity}</td><td>${money(r.total_cost)}</td></tr>`).join('')}</table></div></section>`}
-function reports(){let f=today().slice(0,8)+'01',t=today();return `<section><h1>Raporlar</h1><div class="sub">Ciro, maliyet, gider, brüt/net kâr ve müşteri kârlılığı.</div><div class="panel"><div class="toolbar"><input id="rf" type="date" value="${f}"><input id="rt" type="date" value="${t}"><button class="btn primary" onclick="renderReport()">Filtrele</button></div></div><div id="report">${reportHtml(f,t)}</div></section>`}
+function reports(){let f=today().slice(0,8)+'01',t=today();return `<section><h1>Raporlar</h1><div class="actions no-print"><button onclick="window.print()">🖨️ Yazdır / PDF</button></div><div class="sub">Ciro, maliyet, gider, brüt/net kâr ve müşteri kârlılığı.</div><div class="panel"><div class="toolbar"><input id="rf" type="date" value="${f}"><input id="rt" type="date" value="${t}"><button class="btn primary" onclick="renderReport()">Filtrele</button></div></div><div id="report">${reportHtml(f,t)}</div></section>`}
 
 function daysBetween(a,b){
   const x=new Date(a+'T00:00:00'), y=new Date(b+'T00:00:00');
