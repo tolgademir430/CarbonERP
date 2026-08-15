@@ -1,2 +1,371 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>CarbonERP</title></head><body><div id="app">CarbonERP yükleniyor...</div></body></html>
+<html lang="tr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CarbonERP V12 - Yönetici Dashboard</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f5f6f8;color:#20252b}
+header{height:64px;background:#20252b;color:#fff;display:flex;align-items:center;padding:0 24px;justify-content:space-between}.logo{font-size:22px;font-weight:700}
+nav{background:#fff;border-bottom:1px solid #ddd;padding:10px 20px;display:flex;gap:7px;overflow:auto}nav button{border:0;background:transparent;padding:10px 13px;border-radius:8px;cursor:pointer;font-weight:600;white-space:nowrap}nav button.active,nav button:hover{background:#eceff2}
+main{max-width:1250px;margin:24px auto;padding:0 20px}h1{margin:0 0 5px;font-size:26px}.sub{color:#68717a;margin-bottom:20px}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}.card,.panel{background:#fff;border:1px solid #e1e4e7;border-radius:12px;padding:18px;box-shadow:0 1px 2px #00000008}.card small{color:#68717a}.value{font-size:24px;font-weight:700;margin-top:7px}.positive{color:#16734a}.warning{color:#9a6700}.danger{color:#b42318}
+.grid{display:grid;grid-template-columns:1.4fr 1fr;gap:18px}.panel h2{font-size:17px;margin:0 0 14px}.formgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.field label{display:block;font-size:12px;color:#68717a;margin-bottom:6px;font-weight:600}
+input,select{width:100%;padding:11px;border:1px solid #cfd4d9;border-radius:8px;background:#fff}.actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}.btn{border:0;border-radius:8px;padding:11px 16px;cursor:pointer;font-weight:700}.primary{background:#20252b;color:#fff}.secondary{background:#eceff2}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #eee}th{color:#68717a;font-size:12px}.empty{text-align:center;color:#68717a;padding:30px}.toolbar{display:flex;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}.modal{position:fixed;inset:0;background:#0006;display:none;align-items:center;justify-content:center;padding:20px}.modal.open{display:flex}.modalbox{background:#fff;border-radius:14px;padding:22px;max-width:700px;width:100%;max-height:90vh;overflow:auto}
+#login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.loginbox{background:#fff;border:1px solid #ddd;border-radius:16px;padding:28px;width:min(420px,100%);box-shadow:0 8px 30px #00000012}.loginbox h1{margin-bottom:20px}.loginbox .field{margin-bottom:14px}.status{font-size:12px;color:#68717a;margin-top:10px}
+@media(max-width:850px){.cards{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.formgrid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="loginScreen"><div class="loginbox"><h1>CarbonERP</h1><div class="sub">Bulut sistemi</div>
+<div class="field"><label>E-posta</label><input id="loginEmail" type="email"></div>
+<div class="field"><label>Şifre</label><input id="loginPassword" type="password"></div>
+<button class="btn primary" style="width:100%" onclick="login()">Giriş Yap</button>
+<div id="loginStatus" class="status"></div></div></div>
+<div id="appShell" style="display:none"><header><div class="logo">CarbonERP</div><div><span id="userEmail"></span> <button class="btn secondary" onclick="logout()">Çıkış</button></div></header><nav id="nav"></nav><main id="app"></main></div>
+<div class="modal" id="modal"><div class="modalbox" id="modalbox"></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL="https://mrsnkzfoodryzyekuwyq.supabase.co";
+const SUPABASE_KEY="sb_publishable_oqB_eOPlpe5QoMZ9Y8TXtw_2jU9b-NS";
+const client=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+let data={customers:[],sales:[],collections:[],purchases:[],expenses:[],stockMovements:[],stockQty:0,stockCost:0};
+let warehouse=null,product=null,currentUser=null;
+
+function money(n){return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' TL'}
+function vatCalc(base, rate){
+  const b=Number(base||0), r=Number(rate||0);
+  return {base:b, vat:b*r/100, total:b*(1+r/100)};
+}
+function vatOptions(selected=20){
+  return [0,1,10,20].map(v=>`<option value="${v}" ${Number(selected)===v?'selected':''}>%${v}</option>`).join('');
+}
+
+function today(){return new Date().toISOString().slice(0,10)}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function msg(e){return e?.message||String(e)}
+function customerName(id){return data.customers.find(c=>c.id===id)?.name||'Bilinmiyor'}
+function weightedCost(){
+  // Moving weighted-average cost:
+  // stock value / stock quantity. Purchase extra costs are already included
+  // in stock movement total_cost; sales remove cost at the current average.
+  return data.stockQty>0 ? data.stockCost/data.stockQty : 0;
+}
+function stockSnapshot(){
+  return {
+    qty: Number(data.stockQty||0),
+    value: Number(data.stockCost||0),
+    avg: weightedCost()
+  };
+}
+function customerBalance(id){return data.sales.filter(s=>s.customer_id===id).reduce((a,s)=>a+s.total,0)-data.collections.filter(c=>c.customer_id===id).reduce((a,c)=>a+c.amount,0)}
+function totalReceivable(){return data.sales.reduce((a,s)=>a+s.total,0)-data.collections.reduce((a,c)=>a+c.amount,0)}
+
+async function login(){
+ const email=loginEmail.value.trim(),password=loginPassword.value;
+ document.getElementById('loginStatus').textContent='Giriş yapılıyor...';
+ const {error}=await client.auth.signInWithPassword({email,password});
+ if(error) document.getElementById('loginStatus').textContent=msg(error); else document.getElementById('loginStatus').textContent='';
+}
+async function logout(){await client.auth.signOut()}
+client.auth.onAuthStateChange(async (_event,session)=>{
+ if(session){currentUser=session.user;loginScreen.style.display='none';appShell.style.display='block';userEmail.textContent=session.user.email;await loadData();show('dashboard')}
+ else{currentUser=null;appShell.style.display='none';loginScreen.style.display='flex'}
+});
+
+async function loadData(){
+ const [cu,sa,co,pu,pi,ex,sm,w,p]=await Promise.all([
+  client.from('customers').select('*').eq('is_active',true).order('name'),
+  client.from('sales').select('*,sale_items(*)').order('sale_date'),
+  client.from('collections').select('*').order('collection_date'),
+  client.from('purchases').select('*,purchase_items(*)').order('purchase_date'),
+  client.from('purchase_items').select('*'),
+  client.from('expenses').select('*').order('expense_date'),
+  client.from('stock_movements').select('*').order('movement_date'),
+  client.from('warehouses').select('*').eq('is_active',true).limit(1).maybeSingle(),
+  client.from('products').select('*').eq('is_active',true).limit(1).maybeSingle()
+ ]);
+ for(const r of [cu,sa,co,pu,ex,sm,w,p]) if(r.error) throw r.error;
+ data.customers=cu.data||[];data.sales=sa.data||[];data.collections=co.data||[];data.purchases=pu.data||[];data.expenses=ex.data||[];data.stockMovements=sm.data||[];warehouse=w.data;product=p.data;
+ data.stockQty=data.stockMovements.reduce((a,m)=>a+Number(m.quantity||0),0);
+ data.stockCost=data.stockMovements.reduce((a,m)=>a+Number(m.total_cost||0),0);
+}
+function nav(page){const pages=['dashboard','sales','customers','collections','purchases','expenses','stock','reports'];const labels={dashboard:'Dashboard',sales:'Satış',customers:'Müşteriler',collections:'Tahsilatlar',purchases:'Alışlar',expenses:'Giderler',stock:'Stok',reports:'Raporlar'};return pages.map(x=>`<button class="${x===page?'active':''}" onclick="show('${x}')">${labels[x]}</button>`).join('')}
+async function show(page){document.getElementById('nav').innerHTML=nav(page);document.getElementById('app').innerHTML=({dashboard,sales,customers,collections,purchases,expenses,stock,reports})[page]()}
+function daysLate(d){if(!d)return 0;const a=new Date(d+'T23:59:59'),b=new Date(today()+'T23:59:59');return Math.max(0,Math.floor((b-a)/86400000))}
+function saleCollected(saleId){return data.collections.filter(c=>c.sale_id===saleId).reduce((a,c)=>a+Number(c.amount||0),0)}
+function saleOutstanding(s){return Math.max(0,Number(s.total||0)-saleCollected(s.id))}
+function overdueSales(){return data.sales.filter(s=>s.due_date && saleOutstanding(s)>0 && s.due_date<today())}
+function dueTodaySales(){return data.sales.filter(s=>s.due_date===today() && saleOutstanding(s)>0)}
+
+function monthKey(d){ return String(d||'').slice(0,7); }
+function monthlySummary(){
+  const map={};
+  (data.sales||[]).forEach(s=>{
+    const k=monthKey(s.sale_date); if(!k)return;
+    if(!map[k])map[k]={sales:0,cost:0,kg:0};
+    map[k].sales+=Number(s.subtotal||0);
+    map[k].cost+=Number(s.cost_total||0);
+    map[k].kg+=Number(s.sale_items?.[0]?.quantity||0);
+  });
+  return Object.keys(map).sort().slice(-6).map(k=>{
+    const x=map[k], profit=x.sales-x.cost;
+    return {k,...x,profit,margin:x.sales?profit/x.sales*100:0};
+  });
+}
+function monthlySummaryTable(){
+  const rows=monthlySummary();
+  if(!rows.length)return '<div class="empty">Henüz aylık satış verisi yok.</div>';
+  return `<table><tr><th>Ay</th><th>Ciro</th><th>Maliyet</th><th>Brüt Kâr</th><th>Marj</th><th>Kg</th></tr>${
+    rows.map(x=>`<tr><td>${x.k}</td><td>${money(x.sales)}</td><td>${money(x.cost)}</td><td class="${x.profit>=0?'positive':'danger'}">${money(x.profit)}</td><td>%${x.margin.toFixed(1)}</td><td>${x.kg.toLocaleString('tr-TR')}</td></tr>`).join('')
+  }</table>`;
+}
+function dashboard(){
+  let ds=data.sales.filter(s=>s.sale_date===today());
+  let de=data.expenses.filter(e=>e.expense_date===today());
+  let rev=ds.reduce((a,s)=>a+Number(s.total||0),0);
+  let base=ds.reduce((a,s)=>a+Number(s.subtotal||0),0);
+  let cost=ds.reduce((a,s)=>a+Number(s.cost_total||0),0);
+  let exp=de.reduce((a,e)=>a+Number(e.amount||0),0);
+  let gross=base-cost, net=gross-exp;
+  let over=overdueSales(),due=dueTodaySales();
+  return `<section><h1>Ana Dashboard</h1><div class="sub">Bugünün satış, maliyet, gider ve kârlılık özeti</div>
+  <div class="cards">
+    <div class="card"><small>Bugünkü Satış (KDV dahil)</small><div class="value">${money(rev)}</div></div>
+    <div class="card"><small>Bugünkü Ciro (KDV hariç)</small><div class="value">${money(base)}</div></div>
+    <div class="card"><small>Bugünkü Brüt Kâr</small><div class="value positive">${money(gross)}</div></div>
+    <div class="card"><small>Bugünkü Gider</small><div class="value">${money(exp)}</div></div>
+    <div class="card"><small>Bugünkü Net Kâr</small><div class="value ${net>=0?'positive':'danger'}">${money(net)}</div></div>
+    <div class="card"><small>Toplam Cari Alacak</small><div class="value warning">${money(totalReceivable())}</div></div>
+    <div class="card"><small>Vadesi Geçen</small><div class="value warning">${money(over.reduce((a,s)=>a+saleOutstanding(s),0))}</div></div>
+    <div class="card"><small>Depo Stoku</small><div class="value">${data.stockQty.toLocaleString('tr-TR')} kg</div></div>
+  </div>
+  <div class="panel"><h2>Yönetici Özeti</h2>
+    <div class="sub">Bugünkü operasyonun hızlı görünümü</div>
+    <table><tr><th>Gösterge</th><th>Tutar</th></tr>
+      <tr><td>Toplam cari alacak</td><td>${money(totalReceivable())}</td></tr>
+      <tr><td>Bugün tahsil edilen</td><td>${money((data.collections||[]).filter(x=>x.collection_date===today()).reduce((a,x)=>a+Number(x.amount||0),0))}</td></tr>
+      <tr><td>Toplam stok değeri</td><td>${money(data.stockCost)}</td></tr>
+      <tr><td>Ortalama stok maliyeti</td><td>${money(weightedCost())}/kg</td></tr>
+    </table>
+  </div>
+  <div class="grid">
+    <div class="panel"><h2>Vade Takibi</h2>${dueTable([...over,...due])}</div>
+    <div class="panel"><h2>Son Satışlar</h2>${salesTable(data.sales.slice(-8).reverse())}</div>
+  </div>
+  <div class="panel"><h2>Son 6 Ay Performansı</h2>${monthlySummaryTable()}</div>
+  <div class="panel"><h2>Stok ve Maliyet</h2><table><tr><th>Ürün</th><th>Stok</th><th>Ortalama Maliyet</th><th>Değer</th></tr><tr><td>${esc(product?.name||'Mangal Kömürü')}</td><td>${data.stockQty} kg</td><td>${money(weightedCost())}/kg</td><td>${money(data.stockCost)}</td></tr></table></div>
+  </section>`;
+}
+function dueTable(arr){if(!arr.length)return '<div class="empty">Vadesi gelen açık satış yok.</div>';return `<table><tr><th>Müşteri</th><th>Vade</th><th>Kalan</th><th>Durum</th><th></th></tr>${arr.map(s=>{let late=daysLate(s.due_date),out=saleOutstanding(s);return `<tr><td>${esc(customerName(s.customer_id))}</td><td>${s.due_date}</td><td class="warning">${money(out)}</td><td>${s.due_date<today()?`<span class="warning">${late} gün gecikmiş</span>`:'Bugün'}</td><td><button class="btn secondary" onclick="openCollectionForSale('${s.id}')">Tahsilat</button></td></tr>`}).join('')}</table>`}
+function salesTable(arr){if(!arr.length)return '<div class="empty">Henüz satış yok.</div>';return `<table><tr><th>Tarih</th><th>Müşteri</th><th>Tutar</th><th>Vade</th><th>Kalan</th><th>Kâr</th></tr>${arr.map(s=>`<tr><td>${s.sale_date}</td><td>${esc(customerName(s.customer_id))}</td><td>${money(s.total)}</td><td>${s.due_date||'Peşin'}</td><td>${s.due_date?money(saleOutstanding(s)):'-'}</td><td class="positive">${money(Number(s.subtotal||s.total)-Number(s.cost_total))}</td></tr>`).join('')}</table>`}
+function sales(){return `<section><h1>Yeni Satış</h1><div class="sub">Satış kaydı cari, stok ve kârlılığı günceller.</div><div class="grid"><div class="panel"><div class="formgrid"><div class="field"><label>Müşteri</label><select id="s_customer">${data.customers.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></div><div class="field"><label>Tarih</label><input id="s_date" type="date" value="${today()}"></div><div class="field"><label>Miktar (kg)</label><input id="s_kg" type="number" min="0" value="100" oninput="previewSale()"></div><div class="field"><label>Satış Fiyatı (KDV hariç) TL/kg</label><input id="s_price" type="number" min="0" step=".01" value="50" oninput="previewSale()"></div><div class="field"><label>KDV Oranı</label><select id="s_vat" onchange="previewSale()">${vatOptions(20)}</select></div><div class="field"><label>Ödeme</label><select id="s_payment" onchange="document.getElementById('dueWrap').style.display=this.value==='Vadeli'?'block':'none'"><option>Peşin</option><option>Havale/EFT</option><option>Kredi Kartı</option><option>Vadeli</option></select></div><div class="field" id="dueWrap" style="display:none"><label>Vade Tarihi</label><input id="s_due" type="date"></div></div><div class="actions"><button class="btn primary" onclick="saveSale()">Satışı Kaydet</button></div></div><div class="panel"><h2>Kâr Önizleme</h2><div>Ortalama maliyet: <b>${money(weightedCost())}/kg</b></div><div>Mal bedeli (KDV hariç): <b id="spBase">${money(5000)}</b></div><div>Hesaplanan KDV: <b id="spVat">${money(1000)}</b></div><div class="value" id="spTotal">${money(6000)}</div><div class="positive" id="spProfit"></div></div></div></section>`}
+function previewSale(){
+ let q=+s_kg.value||0,p=+s_price.value||0,vr=+s_vat.value||0;
+ let v=vatCalc(q*p,vr);
+ spBase.textContent=money(v.base);
+ spVat.textContent=money(v.vat);
+ spTotal.textContent=money(v.total);
+ spProfit.textContent='Brüt kâr: '+money(v.base-q*weightedCost())+' (KDV hariç)';
+}
+async function saveSale(){try{if(!data.customers.length)return alert('Önce müşteri ekleyin.');let q=+s_kg.value,p=+s_price.value;if(!(q>0&&p>=0))return alert('Kg ve fiyatı kontrol edin.');if(q>data.stockQty)return alert('Yeterli stok yok.');let payment=s_payment.value,due=s_due?.value||null;if(payment==='Vadeli'&&!due)return alert('Vade tarihi girin.');
+let base=q*p,vatRate=+s_vat.value||0,vatAmount=base*vatRate/100,total=base+vatAmount,cost=q*weightedCost();
+let {data:sale,error}=await client.from('sales').insert({customer_id:s_customer.value,warehouse_id:warehouse.id,sale_date:s_date.value,payment_type:payment,due_date:due,subtotal:base,vat_rate:vatRate,vat_amount:vatAmount,total:total,cost_total:cost,created_by:currentUser.id}).select().single();if(error)throw error;let {error:e1}=await client.from('sale_items').insert({sale_id:sale.id,product_id:product.id,quantity:q,unit_price:p,vat_rate:vatRate,line_total:base+vatAmount,unit_cost:weightedCost(),cost_total:cost});if(e1)throw e1;let {error:e2}=await client.from('stock_movements').insert({warehouse_id:warehouse.id,product_id:product.id,movement_date:s_date.value,movement_type:'sale',quantity:-q,unit_cost:weightedCost(),total_cost:-cost,reference_id:sale.id});if(e2)throw e2;if(payment!=='Vadeli'){let {error:e3}=await client.from('collections').insert({customer_id:s_customer.value,sale_id:sale.id,collection_date:s_date.value,payment_type:payment==='Peşin'?'Peşin':payment,amount:total,created_by:currentUser.id});if(e3)throw e3}await loadData();alert('Satış buluta kaydedildi.');show('dashboard')}catch(e){alert(msg(e))}}
+function customers(){return `<section><h1>Müşteriler</h1><div class="sub">Cari hesaplar bulutta tutuluyor.</div><div class="panel"><div class="toolbar"><button class="btn primary" onclick="openCustomer()">+ Müşteri Ekle</button></div>${customerTable()}</div></section>`}
+function customerTable(){if(!data.customers.length)return '<div class="empty">Henüz müşteri yok.</div>';return `<table><tr><th>Müşteri</th><th>Telefon</th><th>Satış</th><th>Tahsilat</th><th>Bakiye</th><th></th></tr>${data.customers.map(c=>{let s=data.sales.filter(x=>x.customer_id===c.id).reduce((a,x)=>a+Number(x.total),0),p=data.collections.filter(x=>x.customer_id===c.id).reduce((a,x)=>a+Number(x.amount),0);return `<tr><td>${esc(c.name)}</td><td>${esc(c.phone)}</td><td>${money(s)}</td><td>${money(p)}</td><td class="${s-p>0?'warning':'positive'}">${money(s-p)}</td><td><button class="btn secondary" onclick="customerDetail('${c.id}')">Ekstre</button></td></tr>`}).join('')}</table>`}
+function openCustomer(){modalbox.innerHTML=`<h2>Yeni Müşteri</h2><div class="formgrid"><div class="field"><label>Ad</label><input id="c_name"></div><div class="field"><label>Telefon</label><input id="c_phone"></div><div class="field"><label>Adres</label><input id="c_addr"></div><div class="field"><label>Vergi No</label><input id="c_tax"></div></div><div class="actions"><button class="btn secondary" onclick="closeModal()">İptal</button><button class="btn primary" onclick="addCustomer()">Kaydet</button></div>`;modal.classList.add('open')}
+async function addCustomer(){try{let n=c_name.value.trim();if(!n)return alert('Müşteri adı zorunlu.');let {error}=await client.from('customers').insert({name:n,phone:c_phone.value,address:c_addr.value,tax_number:c_tax.value});if(error)throw error;await loadData();closeModal();show('customers')}catch(e){alert(msg(e))}}
+function customerDetail(id){let c=data.customers.find(x=>x.id===id),sales=data.sales.filter(s=>s.customer_id===id),cols=data.collections.filter(x=>x.customer_id===id),ev=[...sales.map(s=>({d:s.sale_date,t:'Satış',x:`${Number(s.subtotal||s.total).toLocaleString('tr-TR')} TL${s.due_date?' · Vade '+s.due_date:''}`,debit:+s.total,credit:0,ref:s.id})),...cols.map(x=>({d:x.collection_date,t:'Tahsilat',x:x.payment_type,debit:0,credit:+x.amount,ref:x.sale_id}))].sort((a,b)=>a.d.localeCompare(b.d));let b=0;modalbox.innerHTML=`<h2>${esc(c.name)} — Cari Ekstre</h2><table><tr><th>Tarih</th><th>İşlem</th><th>Açıklama</th><th>Borç</th><th>Alacak</th><th>Bakiye</th></tr>${ev.map(e=>{b+=e.debit-e.credit;return `<tr><td>${e.d}</td><td>${e.t}</td><td>${esc(e.x)}</td><td>${e.debit?money(e.debit):'-'}</td><td>${e.credit?money(e.credit):'-'}</td><td>${money(b)}</td></tr>`}).join('')}</table><div class="status">Toplam satış: ${money(sales.reduce((a,s)=>a+Number(s.total),0))} · Toplam tahsilat: ${money(cols.reduce((a,c)=>a+Number(c.amount),0))} · Bakiye: ${money(customerBalance(id))}</div><div class="actions"><button class="btn secondary" onclick="openCollectionForCustomer('${id}')">Tahsilat Gir</button><button class="btn primary" onclick="closeModal()">Kapat</button></div>`;modal.classList.add('open')}
+function closeModal(){modal.classList.remove('open')}
+function collections(){let overdue=overdueSales(),due=dueTodaySales(),open=data.sales.filter(s=>saleOutstanding(s)>0&&s.due_date);return `<section><h1>Tahsilatlar & Vade Takibi</h1><div class="sub">Kısmi tahsilatlar ve satış bazında kalan bakiyeler Supabase'de tutulur.</div><div class="cards"><div class="card"><small>Toplam Cari Alacak</small><div class="value warning">${money(totalReceivable())}</div></div><div class="card"><small>Vadesi Geçen</small><div class="value warning">${money(overdue.reduce((a,s)=>a+saleOutstanding(s),0))}</div></div><div class="card"><small>Bugün Vadesi Gelen</small><div class="value">${money(due.reduce((a,s)=>a+saleOutstanding(s),0))}</div></div></div><div class="panel"><div class="toolbar"><button class="btn primary" onclick="openCollection()">+ Tahsilat Gir</button></div><h2>Açık Vadeli Satışlar</h2>${dueTable(open)}</div><div class="panel"><h2>Tahsilat Geçmişi</h2>${data.collections.length?`<table><tr><th>Tarih</th><th>Müşteri</th><th>Tutar</th><th>Yöntem</th><th>Bağlı Satış</th></tr>${data.collections.slice().reverse().map(c=>`<tr><td>${c.collection_date}</td><td>${esc(customerName(c.customer_id))}</td><td class="positive">${money(c.amount)}</td><td>${esc(c.payment_type)}</td><td>${c.sale_id?'Satış #'+String(c.sale_id).slice(0,8):'Cari genel'}</td></tr>`).join('')}</table>`:'<div class="empty">Henüz tahsilat yok.</div>'}</div></section>`}
+function collectionSaleOptions(customerId, selectedSale=null){let arr=data.sales.filter(s=>s.customer_id===customerId&&saleOutstanding(s)>0);return `<option value="">Cari genel tahsilat</option>`+arr.map(s=>`<option value="${s.id}" ${s.id===selectedSale?'selected':''}>${s.sale_date} · ${money(s.total)} · kalan ${money(saleOutstanding(s))}${s.due_date?' · vade '+s.due_date:''}</option>`).join('')}
+function openCollection(){let cid=data.customers[0]?.id||'';openCollectionForCustomer(cid)}
+function openCollectionForCustomer(cid, selectedSale=null){modalbox.innerHTML=`<h2>Tahsilat Gir</h2><div class="formgrid"><div class="field"><label>Müşteri</label><select id="col_c" onchange="refreshCollectionSales()">${data.customers.map(c=>`<option value="${c.id}" ${c.id===cid?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="field"><label>Satış / Vade</label><select id="col_sale">${collectionSaleOptions(cid,selectedSale)}</select></div><div class="field"><label>Tarih</label><input id="col_date" type="date" value="${today()}"></div><div class="field"><label>Tutar</label><input id="col_amount" type="number" min="0" step=".01"></div><div class="field"><label>Yöntem</label><select id="col_method"><option>Havale/EFT</option><option>Kredi Kartı</option><option>Peşin</option><option>Diğer</option></select></div></div><div id="col_hint" class="status">Satış seçersen tahsilat o satışın kalan bakiyesini aşamaz.</div><div class="actions"><button class="btn secondary" onclick="closeModal()">İptal</button><button class="btn primary" onclick="addCollection()">Kaydet</button></div>`;modal.classList.add('open')}
+function refreshCollectionSales(){let c=col_c.value;document.getElementById('col_sale').innerHTML=collectionSaleOptions(c);document.getElementById('col_hint').textContent='Satış seçersen tahsilat o satışın kalan bakiyesini aşamaz.'}
+function openCollectionForSale(saleId){let s=data.sales.find(x=>x.id===saleId);if(s)openCollectionForCustomer(s.customer_id,saleId)}
+async function addCollection(){try{let id=col_c.value,a=+col_amount.value,saleId=col_sale.value||null;if(!(a>0))return alert('Tutar girin.');let max=saleId?saleOutstanding(data.sales.find(s=>s.id===saleId)):customerBalance(id);if(a>max+0.0001)return alert('Tahsilat kalan bakiyeyi aşamaz.');let {error}=await client.from('collections').insert({customer_id:id,sale_id:saleId,collection_date:col_date.value,payment_type:col_method.value,amount:a,created_by:currentUser.id});if(error)throw error;await loadData();closeModal();show('collections')}catch(e){alert(msg(e))}}
+function purchases(){
+let snap=stockSnapshot();
+return `<section><h1>Alış / Stok</h1><div class="sub">Her alıştan sonra stok maliyeti hareketli ağırlıklı ortalama yöntemiyle yeniden hesaplanır.</div><div class="grid"><div class="panel"><div class="formgrid"><div class="field"><label>Tarih</label><input id="p_date" type="date" value="${today()}"></div><div class="field"><label>Kg</label><input id="p_kg" type="number" min="0"></div><div class="field"><label>Alış Fiyatı (KDV hariç) TL/kg</label><input id="p_price" type="number" min="0" step=".01" oninput="previewPurchase()"></div><div class="field"><label>KDV Oranı</label><select id="p_vat" onchange="previewPurchase()">${vatOptions(20)}</select></div><div class="field"><label>Ek maliyet</label><input id="p_extra" type="number" min="0" value="0"></div></div><div class="actions"><button class="btn primary" onclick="addPurchase()">Alışı Kaydet</button></div></div><div class="panel"><h2>Alış KDV Önizleme</h2><div id="ppBase">Mal bedeli (KDV hariç): 0,00 TL</div><div id="ppVat">KDV: 0,00 TL</div><div id="ppTotal">Toplam: 0,00 TL</div><div class="status">KDV %0 seçilebilir; alışın KDV'si varsa oranı işlem bazında belirleyebilirsin.</div></div><div class="panel"><h2>Mevcut Stok</h2><div class="value">${snap.qty.toLocaleString('tr-TR')} kg</div><div>Mevcut ortalama maliyet: <b>${money(snap.avg)}/kg</b></div><div>Stok değeri: <b>${money(snap.value)}</b></div><div class="status">Yeni alış kaydedildiğinde: (mevcut stok değeri + yeni alış maliyeti) / (mevcut kg + yeni kg) uygulanır.</div></div></div></section>`}
+function previewPurchase(){
+ let q=+p_kg.value||0, pr=+p_price.value||0, vr=+p_vat.value||0, extra=+p_extra.value||0;
+ let base=q*pr, vat=base*vr/100, total=base+vat+extra;
+ ppBase.textContent='Mal bedeli (KDV hariç): '+money(base);
+ ppVat.textContent='KDV: '+money(vat);
+ ppTotal.textContent='Toplam: '+money(total);
+}
+async function addPurchase(){try{let q=+p_kg.value,pr=+p_price.value,vatRate=+p_vat.value||0,extra=+p_extra.value||0;if(!(q>0&&pr>=0))return alert('Kg ve alış fiyatını girin.');let base=q*pr,vatAmount=base*vatRate/100,productCost=base+vatAmount+extra;
+let total=productCost;
+let {data:pur,error}=await client.from('purchases').insert({warehouse_id:warehouse.id,purchase_date:p_date.value,subtotal:base,vat_amount:vatAmount,extra_cost:extra,total}).select().single();if(error)throw error;let {error:e1}=await client.from('purchase_items').insert({purchase_id:pur.id,product_id:product.id,quantity:q,unit_price:pr,line_total:q*pr});if(e1)throw e1;let {error:e2}=await client.from('stock_movements').insert({warehouse_id:warehouse.id,product_id:product.id,movement_date:p_date.value,movement_type:'purchase',quantity:q,unit_cost:total/q,total_cost:productCost,reference_id:pur.id});if(e2)throw e2;await loadData();alert('Alış buluta kaydedildi.');show('purchases')}catch(e){alert(msg(e))}}
+function expenses(){return `<section><h1>Giderler</h1><div class="sub">İşletme giderleri net kâra yansır.</div><div class="panel"><div class="formgrid"><div class="field"><label>Tarih</label><input id="e_date" type="date" value="${today()}"></div><div class="field"><label>Tür</label><select id="e_type"><option>Yakıt</option><option>Personel</option><option>Kira</option><option>Araç</option><option>Telefon/İnternet</option><option>Depo</option><option>Nakliye</option><option>Banka/POS</option><option>Vergi/Harç</option><option>Pazarlama</option><option>Bakım/Onarım</option><option>Diğer</option></select></div><div class="field"><label>Tutar</label><input id="e_amount" type="number" min="0" step=".01"></div><div class="field"><label>Ödeme Şekli</label><select id="e_method"><option>Nakit</option><option>Havale/EFT</option><option>Kredi Kartı</option><option>Diğer</option></select></div><div class="field"><label>Açıklama</label><input id="e_note"></div></div><div class="actions"><button class="btn primary" onclick="addExpense()">Gideri Kaydet</button></div></div><div class="panel" style="margin-top:18px">${data.expenses.length?`<table><tr><th>Tarih</th><th>Tür</th><th>Açıklama</th><th>Ödeme</th><th>Tutar</th></tr>${data.expenses.slice().reverse().map(e=>`<tr><td>${e.expense_date}</td><td>${esc(e.category)}</td><td>${esc(e.description)}</td><td>${esc(e.payment_type||"")}</td><td>${money(e.amount)}</td></tr>`).join('')}</table>`:'<div class="empty">Henüz gider yok.</div>'}</div></section>`}
+async function addExpense(){try{let a=+e_amount.value;if(!(a>0))return alert('Tutar girin.');let {error}=await client.from('expenses').insert({expense_date:e_date.value,category:e_type.value,description:e_note.value,amount:a,payment_type:e_method.value,created_by:currentUser.id});if(error)throw error;await loadData();show('expenses')}catch(e){alert(msg(e))}}
+function stock(){let rows=data.stockMovements.slice().reverse();return `<section><h1>Stok Hareketleri</h1><div class="sub">Tüm giriş ve çıkışlar Supabase'den okunuyor.</div><div class="cards"><div class="card"><small>Mevcut Stok</small><div class="value">${data.stockQty} kg</div></div><div class="card"><small>Ortalama Maliyet</small><div class="value">${money(weightedCost())}/kg</div></div><div class="card"><small>Stok Değeri</small><div class="value">${money(data.stockCost)}</div></div><div class="card"><small>Hareketli Ortalama Maliyet</small><div class="value">${money(weightedCost())}/kg</div></div><div class="card"><small>Hareket</small><div class="value">${rows.length}</div></div></div><div class="panel"><table><tr><th>Tarih</th><th>İşlem</th><th>Kg</th><th>Maliyet</th></tr>${rows.map(r=>`<tr><td>${r.movement_date}</td><td>${r.movement_type}</td><td class="${r.quantity>0?'positive':'danger'}">${r.quantity}</td><td>${money(r.total_cost)}</td></tr>`).join('')}</table></div></section>`}
+function reports(){let f=today().slice(0,8)+'01',t=today();return `<section><h1>Raporlar</h1><div class="sub">Ciro, maliyet, gider, brüt/net kâr ve müşteri kârlılığı.</div><div class="panel"><div class="toolbar"><input id="rf" type="date" value="${f}"><input id="rt" type="date" value="${t}"><button class="btn primary" onclick="renderReport()">Filtrele</button></div></div><div id="report">${reportHtml(f,t)}</div></section>`}
+
+function daysBetween(a,b){
+  const x=new Date(a+'T00:00:00'), y=new Date(b+'T00:00:00');
+  return Math.floor((y-x)/86400000);
+}
+function agingBucket(days){
+  if(days<=30) return '0-30 gün';
+  if(days<=60) return '31-60 gün';
+  if(days<=90) return '61-90 gün';
+  return '90+ gün';
+}
+function receivableAging(){
+  const todayStr=today();
+  const rows=(data.sales||[]).map(s=>{
+    const out=saleOutstanding(s);
+    if(out<=0) return null;
+    const due=s.due_date || s.sale_date;
+    const age=Math.max(0,daysBetween(due,todayStr));
+    return {s,out,due,age,bucket:agingBucket(age),customer:customerName(s.customer_id)};
+  }).filter(Boolean);
+  const buckets=['0-30 gün','31-60 gün','61-90 gün','90+ gün'];
+  return buckets.map(b=>({bucket:b,amount:rows.filter(x=>x.bucket===b).reduce((a,x)=>a+x.out,0),count:rows.filter(x=>x.bucket===b).length}));
+}
+function periodLabel(f,t){ return f===t ? f : `${f} → ${t}`; }
+
+
+function vatReport(f,t){
+  const sales=(data.sales||[]).filter(x=>x.sale_date>=f&&x.sale_date<=t);
+  const purchases=(data.purchases||[]).filter(x=>x.purchase_date>=f&&x.purchase_date<=t);
+  const salesBase=sales.reduce((a,x)=>a+Number(x.subtotal||0),0);
+  const outputVat=sales.reduce((a,x)=>a+Number(x.vat_amount||0),0);
+  const inputVat=purchases.reduce((a,x)=>a+Number(x.vat_amount||0),0);
+  const payable=outputVat-inputVat;
+  const rateMap={};
+  sales.forEach(x=>{const r=Number(x.vat_rate||0);rateMap[r]=(rateMap[r]||0)+Number(x.vat_amount||0)});
+  return `<div class="panel"><h2>KDV Raporu</h2>
+    <table><tr><th>Kalem</th><th>Tutar</th></tr>
+      <tr><td>Satış matrahı (KDV hariç)</td><td>${money(salesBase)}</td></tr>
+      <tr><td>Hesaplanan satış KDV</td><td>${money(outputVat)}</td></tr>
+      <tr><td>Alışlarda kaydedilen KDV</td><td>${money(inputVat)}</td></tr>
+      <tr><td><b>Hesaplanan fark</b></td><td class="${payable>=0?'warning':'positive'}"><b>${money(payable)}</b></td></tr>
+    </table>
+    <div class="sub">Satış KDV'sinin oranlara göre dağılımı</div>
+    <table><tr><th>KDV oranı</th><th>KDV</th></tr>
+      ${Object.keys(rateMap).sort((a,b)=>Number(a)-Number(b)).map(r=>`<tr><td>%${r}</td><td>${money(rateMap[r])}</td></tr>`).join('')}
+    </table>
+    <div class="status">Bu rapor CarbonERP içindeki işlem kayıtlarına göre hesaplanır; resmi vergi beyannamesi yerine geçmez.</div>
+  </div>`;
+}
+function reportHtml(f,t){
+  let s=data.sales.filter(x=>x.sale_date>=f&&x.sale_date<=t);
+  let e=data.expenses.filter(x=>x.expense_date>=f&&x.expense_date<=t);
+
+  // Profit is calculated on VAT-excluded sales revenue.
+  // Purchase VAT is already included in stock/cost because that is how
+  // CarbonERP was configured for this business.
+  let salesBase=s.reduce((a,x)=>a+Number(x.subtotal||0),0);
+  let salesVat=s.reduce((a,x)=>a+Number(x.vat_amount||0),0);
+  let salesTotal=s.reduce((a,x)=>a+Number(x.total||0),0);
+  let c=s.reduce((a,x)=>a+Number(x.cost_total||0),0);
+  let g=salesBase-c;
+  let x=e.reduce((a,y)=>a+Number(y.amount||0),0);
+  let n=g-x;
+  let kg=s.reduce((a,x)=>a+Number(x.sale_items?.[0]?.quantity||0),0);
+
+  return `<div class="cards">
+    <div class="card"><small>Satış Cirosu (KDV hariç)</small><div class="value">${money(salesBase)}</div></div>
+    <div class="card"><small>Satış KDV'si</small><div class="value">${money(salesVat)}</div></div>
+    <div class="card"><small>Müşteriye Kesilen Toplam</small><div class="value">${money(salesTotal)}</div></div>
+    <div class="card"><small>Satılan Miktar</small><div class="value">${kg.toLocaleString('tr-TR')} kg</div></div>
+    <div class="card"><small>Satılan Malın Maliyeti</small><div class="value">${money(c)}</div></div>
+    <div class="card"><small>Brüt Kâr</small><div class="value positive">${money(g)}</div></div>
+    <div class="card"><small>İşletme Giderleri</small><div class="value">${money(x)}</div></div>
+    <div class="card"><small>Net Kâr / Zarar</small><div class="value ${n>=0?'positive':'danger'}">${money(n)}</div></div>
+  </div>
+  <div class="panel">
+    <h2>Kâr / Zarar Özeti</h2>
+    <table>
+      <tr><th>Kalem</th><th>Tutar</th></tr>
+      <tr><td>Satışlar (KDV hariç)</td><td>${money(salesBase)}</td></tr>
+      <tr><td>Satılan malın maliyeti</td><td>${money(c)}</td></tr>
+      <tr><td><b>Brüt kâr</b></td><td><b>${money(g)}</b></td></tr>
+      <tr><td>İşletme giderleri</td><td>${money(x)}</td></tr>
+      <tr><td><b>Net kâr / zarar</b></td><td class="${n>=0?'positive':'danger'}"><b>${money(n)}</b></td></tr>
+    </table>
+    <div class="status">Satış KDV'si kâr hesabına dahil edilmez. Alışlarda KDV, mevcut stok maliyet politikanıza göre maliyete dahil edilir.</div>
+  </div>
+  <div class="panel">
+    <h2>Gider Dağılımı</h2>
+    ${expenseBreakdown(e)}
+  </div>
+  ${vatReport(f,t)}
+  <div class="panel">
+    <h2>Cari Yaşlandırma</h2>
+    ${agingTable()}
+  </div>
+  <div class="panel">
+    <h2>Müşteri Kârlılığı</h2>
+    ${customerProfit(s)}
+  </div>
+  <div class="panel">
+    <h2>Satış Performansı</h2>
+    ${salesPerformance(s)}
+  </div>`;
+}
+function agingTable(){
+  const a=receivableAging();
+  const total=a.reduce((z,x)=>z+x.amount,0);
+  return `<table><tr><th>Vade Yaşı</th><th>Dosya/Satış</th><th>Alacak</th><th>Pay</th></tr>${
+    a.map(x=>`<tr><td>${x.bucket}</td><td>${x.count}</td><td>${money(x.amount)}</td><td>%${total?(x.amount/total*100).toFixed(1):'0.0'}</td></tr>`).join('')
+  }</table><div class="status">Toplam açık cari: <b>${money(total)}</b></div>`;
+}
+function salesPerformance(s){
+  if(!s.length) return '<div class="empty">Bu dönemde satış yok.</div>';
+  let kg=0;
+  s.forEach(x=>{ kg += Number(x.sale_items?.[0]?.quantity||0); });
+  let revenue=s.reduce((z,x)=>z+Number(x.subtotal||0),0);
+  let cost=s.reduce((z,x)=>z+Number(x.cost_total||0),0);
+  let profit=revenue-cost;
+  let avgKg=kg?revenue/kg:0;
+  let margin=revenue?profit/revenue*100:0;
+  return `<table>
+    <tr><th>Gösterge</th><th>Sonuç</th></tr>
+    <tr><td>Satış adedi</td><td>${s.length}</td></tr>
+    <tr><td>Satılan miktar</td><td>${kg.toLocaleString('tr-TR')} kg</td></tr>
+    <tr><td>Ortalama satış fiyatı</td><td>${money(avgKg)}/kg</td></tr>
+    <tr><td>Brüt kâr</td><td>${money(profit)}</td></tr>
+    <tr><td>Brüt kâr marjı</td><td>%${margin.toFixed(1)}</td></tr>
+  </table>`;
+}
+function expenseBreakdown(e){
+  if(!e.length) return '<div class="empty">Bu dönemde gider yok.</div>';
+  let cats=[...new Set(e.map(x=>x.category||'Diğer'))];
+  return `<table><tr><th>Gider Türü</th><th>Toplam</th><th>Pay</th></tr>${
+    cats.map(cat=>{
+      let amount=e.filter(x=>(x.category||'Diğer')===cat).reduce((a,x)=>a+Number(x.amount||0),0);
+      let total=e.reduce((a,x)=>a+Number(x.amount||0),0);
+      let pct=total?amount/total*100:0;
+      return `<tr><td>${esc(cat)}</td><td>${money(amount)}</td><td>%${pct.toFixed(1)}</td></tr>`;
+    }).join('')
+  }</table>`;
+}
+function stockReport(){
+  return `<div class="panel"><h2>Stok Raporu</h2>
+  <table><tr><th>Ürün</th><th>Miktar</th><th>Ortalama Maliyet</th><th>Stok Değeri</th></tr>
+  <tr><td>${esc(product?.name||'Mangal Kömürü')}</td><td>${Number(data.stockQty||0).toLocaleString('tr-TR')} kg</td><td>${money(weightedCost())}/kg</td><td>${money(data.stockCost)}</td></tr></table>
+  </div>`;
+}
+function renderReport(){report.innerHTML=reportHtml(rf.value,rt.value)}
+function customerProfit(s){
+  let ids=[...new Set(s.map(x=>x.customer_id))];
+  if(!ids.length)return '<div class="empty">Satış yok.</div>';
+  return `<table><tr><th>Müşteri</th><th>Kg</th><th>Ciro (KDV hariç)</th><th>Maliyet</th><th>Brüt Kâr</th><th>Marj</th></tr>${
+    ids.map(id=>{
+      let a=s.filter(x=>x.customer_id===id);
+      let kg=a.reduce((z,x)=>z+Number(x.sale_items?.[0]?.quantity||0),0);
+      let r=a.reduce((z,x)=>z+Number(x.subtotal||0),0);
+      let c=a.reduce((z,x)=>z+Number(x.cost_total||0),0);
+      let p=r-c;
+      let m=r?p/r*100:0;
+      return `<tr><td>${esc(customerName(id))}</td><td>${kg.toLocaleString('tr-TR')}</td><td>${money(r)}</td><td>${money(c)}</td><td class="${p>=0?'positive':'danger'}">${money(p)}</td><td>%${m.toFixed(1)}</td></tr>`;
+    }).join('')
+  }</table>`;
+}
+(async()=>{const {data:{session}}=await client.auth.getSession();if(session){currentUser=session.user;loginScreen.style.display='none';appShell.style.display='block';userEmail.textContent=session.user.email;try{await loadData();show('dashboard')}catch(e){alert('Veriler yüklenemedi: '+msg(e))}}})();
+</script>
+</body></html>
