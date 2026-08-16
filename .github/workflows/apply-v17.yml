@@ -1,0 +1,24 @@
+name: CarbonERP V17 Collection
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/apply_v17_collection.py'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Apply V17 collection
+        run: python3 scripts/apply_v17_collection.py
+      - name: Commit updated app
+        run: |
+          git config user.name "CarbonERP Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet || git commit -m "CarbonERP: V17 smart collections"
+          git push
