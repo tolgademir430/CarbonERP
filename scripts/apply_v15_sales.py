@@ -68,3 +68,4 @@ if 'id="carbonerp-v15-sales"' not in s:
 
 p.write_text(s,encoding='utf-8')
 print('V15 sales UI applied')
+# CarbonERP V15 sales trigger validation
