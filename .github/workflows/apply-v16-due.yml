@@ -5,8 +5,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'scripts/apply_v16_due.py'
 
 permissions:
   contents: write
