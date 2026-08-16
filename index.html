@@ -55,6 +55,11 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;p
 <style id="carbonerp-delivery-v14">
 .delivery-note{font-family:Arial,sans-serif;color:#111}.delivery-note h1{font-size:24px;margin:0 0 6px}.delivery-note .meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0}.delivery-note table{width:100%;border-collapse:collapse}.delivery-note th,.delivery-note td{border:1px solid #bbb;padding:8px}.delivery-note .sign{display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:55px}.delivery-note .line{border-top:1px solid #999;padding-top:7px;text-align:center}@media print{.delivery-print-actions{display:none!important}}
 </style>
+<style id="carbonerp-v15-sales">
+.sale-fast-card{border:1px solid #d9e6dc;background:#f5fbf7;border-radius:10px;padding:12px}
+#s_customer_search{font-size:16px}
+@media(max-width:600px){.formgrid{grid-template-columns:1fr!important}.actions .btn{flex:1}.panel{padding:14px}}
+</style>
 </head>
 <body>
 <div id="loginScreen"><div class="loginbox"><h1>CarbonERP</h1><div class="sub">Bulut sistemi</div>
@@ -172,6 +177,11 @@ function printCustomerStatement(customerId){
   w.document.write(`<html><head><title>Cari Ekstre - ${esc(c.name||'')}</title><style>body{font-family:Arial;padding:30px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}h1{margin-bottom:4px}.total{margin-top:20px;font-size:20px;font-weight:bold}</style><style id="carbonerp-delivery-v14">
 .delivery-note{font-family:Arial,sans-serif;color:#111}.delivery-note h1{font-size:24px;margin:0 0 6px}.delivery-note .meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0}.delivery-note table{width:100%;border-collapse:collapse}.delivery-note th,.delivery-note td{border:1px solid #bbb;padding:8px}.delivery-note .sign{display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:55px}.delivery-note .line{border-top:1px solid #999;padding-top:7px;text-align:center}@media print{.delivery-print-actions{display:none!important}}
 </style>
+<style id="carbonerp-v15-sales">
+.sale-fast-card{border:1px solid #d9e6dc;background:#f5fbf7;border-radius:10px;padding:12px}
+#s_customer_search{font-size:16px}
+@media(max-width:600px){.formgrid{grid-template-columns:1fr!important}.actions .btn{flex:1}.panel{padding:14px}}
+</style>
 </head><body><h1>CarbonERP - Cari Ekstre</h1><div><b>Müşteri:</b> ${esc(c.name||'')}</div><table><tr><th>Tarih</th><th>İşlem</th><th>Belge</th><th>İşlem Tutarı</th><th>Kalan</th></tr>${rows||'<tr><td colspan="5">Kayıt yok</td></tr>'}</table><div class="total">Toplam Açık Bakiye: ${money(sales.reduce((a,s)=>a+saleOutstanding(s),0))}</div><script>window.onload=()=>window.print()</script></body></html>`);
   w.document.close();
 }
@@ -214,9 +224,59 @@ function dashboard(){
 }
 function dueTable(arr){if(!arr.length)return '<div class="empty">Vadesi gelen açık satış yok.</div>';return `<table><tr><th>Müşteri</th><th>Vade</th><th>Kalan</th><th>Durum</th><th></th></tr>${arr.map(s=>{let late=daysLate(s.due_date),out=saleOutstanding(s);return `<tr><td>${esc(customerName(s.customer_id))}</td><td>${s.due_date}</td><td class="warning">${money(out)}</td><td>${s.due_date<today()?`<span class="warning">${late} gün gecikmiş</span>`:'Bugün'}</td><td><button class="btn secondary" onclick="openCollectionForSale('${s.id}')">Tahsilat</button></td></tr>`}).join('')}</table>`}
 function salesTable(arr){if(!arr.length)return '<div class="empty">Henüz satış yok.</div>';return `<table><tr><th>Tarih</th><th>Müşteri</th><th>Tutar</th><th>Vade</th><th>Kalan</th><th>Kâr</th></tr>${arr.map(s=>`<tr><td>${s.sale_date}</td><td>${esc(customerName(s.customer_id))}</td><td>${money(s.total)}</td><td>${s.due_date||'Peşin'}</td><td>${s.due_date?money(saleOutstanding(s)):'-'}</td><td class="positive">${money(Number(s.subtotal||s.total)-Number(s.cost_total))}</td></tr>`).join('')}</table>`}
-function sales(){return `<section><h1>Yeni Satış</h1><div class="sub">Satış kaydı cari, stok ve kârlılığı günceller.</div><div class="grid"><div class="panel"><div class="formgrid"><div class="field"><label>Müşteri</label><select id="s_customer">${data.customers.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></div><div class="field"><label>Tarih</label><input id="s_date" type="date" value="${today()}"></div><div class="field"><label>Miktar (kg)</label><input id="s_kg" type="number" min="0" value="100" oninput="previewSale()"></div><div class="field"><label>Satış Fiyatı (KDV hariç) TL/kg</label><input id="s_price" type="number" min="0" step=".01" value="50" oninput="previewSale()"></div><div class="field"><label>KDV Oranı</label><select id="s_vat" onchange="previewSale()">${vatOptions(20)}</select></div><div class="field"><label>Ödeme</label><select id="s_payment" onchange="document.getElementById('dueWrap').style.display=this.value==='Vadeli'?'block':'none'"><option>Peşin</option><option>Havale/EFT</option><option>Kredi Kartı</option><option>Vadeli</option></select></div><div class="field" id="dueWrap" style="display:none"><label>Vade Tarihi</label><input id="s_due" type="date"></div></div><div class="actions"><button class="btn primary" onclick="saveSale()">Satışı Kaydet</button></div></div><div class="panel"><h2>Kâr Önizleme</h2><div>Ortalama maliyet: <b>${money(weightedCost())}/kg</b></div><div>Mal bedeli (KDV hariç): <b id="spBase">${money(5000)}</b></div><div>Hesaplanan KDV: <b id="spVat">${money(1000)}</b></div><div class="value" id="spTotal">${money(6000)}</div><div class="positive" id="spProfit"></div></div></div><div class="panel" style="margin-top:18px"><div class="toolbar"><h2 style="margin:0">Son Satışlar</h2><span class="status">Teslimat belgesi yazdırılabilir.</span></div>${recentSalesTable()}</div></section>`}
+function sales(){
+ const c0=data.customers?.[0];
+ return `<section>
+ <div class="toolbar"><div><h1>Satış Ekle</h1><div class="sub">Hızlı satış: müşteri seç, miktar ve fiyatı gir, sonucu anında kontrol et.</div></div><div class="actions" style="margin-top:0"><button class="btn secondary" onclick="show('sales')">Satışlar Listesi</button></div></div>
+ <div class="grid">
+  <div>
+   <div class="panel">
+    <h2>Müşteri</h2>
+    <div class="formgrid">
+     <div class="field" style="grid-column:1/-1"><label>Müşteri Ara</label><input id="s_customer_search" type="search" placeholder="Müşteri adı veya telefon ara..." oninput="filterSaleCustomers()"></div>
+     <div class="field" style="grid-column:1/-1"><label>Müşteri</label><select id="s_customer" onchange="updateSaleCustomerInfo()">${(data.customers||[]).map(c=>`<option value="${c.id}">${esc(c.name)}${c.phone?' · '+esc(c.phone):''}</option>`).join('')}</select></div>
+    </div>
+    <div id="saleCustomerInfo" class="status" style="padding:12px;border:1px solid #d9e6dc;border-radius:8px;background:#f5fbf7"></div>
+   </div>
+   <div class="panel" style="margin-top:18px">
+    <h2>Miktar ve Fiyat</h2>
+    <div class="formgrid">
+     <div class="field"><label>Miktar (kg)</label><div class="actions" style="justify-content:flex-start;margin:0 0 8px"><button type="button" class="btn secondary" onclick="setSaleKg(10)">10 kg</button><button type="button" class="btn secondary" onclick="setSaleKg(25)">25 kg</button><button type="button" class="btn secondary" onclick="setSaleKg(50)">50 kg</button><button type="button" class="btn secondary" onclick="setSaleKg(100)">100 kg</button></div><input id="s_kg" type="number" min="0" step="0.01" value="100" oninput="previewSale()"></div>
+     <div class="field"><label>Birim Fiyat (KDV hariç) TL/kg</label><input id="s_price" type="number" min="0" step="0.01" value="50" oninput="previewSale()"></div>
+    </div>
+    <div class="status">Mevcut stok: <b>${Number(data.stockQty||0).toLocaleString('tr-TR')} kg</b> · Ortalama maliyet: <b>${money(weightedCost())}/kg</b></div>
+   </div>
+  </div>
+  <div>
+   <div class="panel">
+    <h2>Satış Bilgileri</h2>
+    <div class="formgrid">
+     <div class="field"><label>Tarih</label><input id="s_date" type="date" value="${today()}"></div>
+     <div class="field"><label>Ürün</label><select id="s_product">${product?`<option value="${product.id}">${esc(product.name||'Mangal Kömürü')}</option>`:'<option value="">Ürün seçin</option>'}</select></div>
+     <div class="field"><label>KDV Oranı (%)</label><select id="s_vat" onchange="previewSale()">${vatOptions(20)}</select></div>
+     <div class="field"><label>Ödeme</label><select id="s_payment" onchange="toggleSaleDue()"><option>Peşin</option><option>Havale/EFT</option><option>Kredi Kartı</option><option>Vadeli</option></select></div>
+     <div class="field" id="dueWrap" style="display:none;grid-column:1/-1"><label>Vade Tarihi</label><input id="s_due" type="date"></div>
+    </div>
+   </div>
+   <div class="panel" style="margin-top:18px"><h2>Özet</h2><div>Net (KDV Hariç): <b id="spBase">${money(5000)}</b></div><div style="margin-top:8px">KDV: <b id="spVat">${money(1000)}</b></div><hr><div class="value" id="spTotal">${money(6000)}</div><div class="positive" id="spProfit" style="margin-top:8px"></div><div class="status">Eski bakiye: <b id="spOldBalance">${money(c0?customerBalance(c0.id):0)}</b></div><div class="status">Yeni bakiye: <b id="spNewBalance">${money(c0?customerBalance(c0.id)+6000:6000)}</b></div></div>
+  </div>
+ </div>
+ <div class="panel" style="margin-top:18px"><div class="actions" style="justify-content:flex-start;margin-top:0"><label style="display:flex;align-items:center;gap:8px"><input id="s_make_note" type="checkbox" checked> İrsaliye oluştur</label><button class="btn secondary" onclick="clearSaleForm()">Temizle</button><button class="btn primary" onclick="saveSale()">Satışı Kaydet</button></div></div>
+ <div class="panel" style="margin-top:18px"><div class="toolbar"><h2 style="margin:0">Son Satışlar</h2><span class="status">İrsaliye tek tıkla yazdırılabilir.</span></div>${recentSalesTable()}</div>
+ </section>`
+}
+function filterSaleCustomers(){const q=(document.getElementById('s_customer_search')?.value||'').toLocaleLowerCase('tr-TR').trim();const sel=document.getElementById('s_customer');if(!sel)return;[...sel.options].forEach(o=>{o.hidden=!!q&&!o.textContent.toLocaleLowerCase('tr-TR').includes(q)});const first=[...sel.options].find(o=>!o.hidden);if(first){sel.value=first.value;updateSaleCustomerInfo()}}
+function updateSaleCustomerInfo(){const el=document.getElementById('saleCustomerInfo'),sel=document.getElementById('s_customer');if(!el||!sel)return;const c=data.customers.find(x=>x.id===sel.value);if(!c){el.textContent='';return}const bal=customerBalance(c.id);el.innerHTML=`<b>${esc(c.name)}</b>${c.phone?' · '+esc(c.phone):''} · Mevcut bakiye: <b>${money(bal)}</b>`;previewSale()}
+function setSaleKg(q){const el=document.getElementById('s_kg');if(el){el.value=q;previewSale()}}
+function toggleSaleDue(){const p=document.getElementById('s_payment'),w=document.getElementById('dueWrap');if(w&&p)w.style.display=p.value==='Vadeli'?'block':'none'}
+function clearSaleForm(){['s_customer_search','s_kg','s_price','s_due'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=id==='s_kg'?'100':id==='s_price'?'50':''});const p=document.getElementById('s_payment');if(p)p.value='Peşin';toggleSaleDue();previewSale()}
 function recentSalesTable(){const rows=[...(data.sales||[])].sort((a,b)=>String(b.sale_date).localeCompare(String(a.sale_date))).slice(0,20);if(!rows.length)return '<div class="empty">Henüz satış yok.</div>';return `<table><tr><th>Tarih</th><th>Müşteri</th><th>Tutar</th><th>Ödeme</th><th></th></tr>${rows.map(s=>`<tr><td>${esc(s.sale_date)}</td><td>${esc(customerName(s.customer_id))}</td><td>${money(s.total)}</td><td>${esc(s.payment_type||'')}</td><td><button class="btn secondary" onclick="printDeliveryNote('${s.id}')">🧾 İrsaliye</button></td></tr>`).join('')}</table>`}
-function printDeliveryNote(saleId){const s=(data.sales||[]).find(x=>x.id===saleId);if(!s)return alert('Satış bulunamadı.');const c=(data.customers||[]).find(x=>x.id===s.customer_id)||{};const items=s.sale_items||[];const qty=items.reduce((a,x)=>a+Number(x.quantity||0),0);const w=window.open('','_blank');if(!w)return;const no=String(s.id).slice(0,8).toUpperCase();w.document.write(`<html><head><title>İrsaliye ${no}</title><style>@page{size:A4;margin:15mm}body{font-family:Arial,sans-serif;color:#111}.delivery-note h1{font-size:24px;margin:0 0 6px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0}.meta div{border:1px solid #ddd;padding:8px}.delivery-note table{width:100%;border-collapse:collapse;margin-top:18px}.delivery-note th,.delivery-note td{border:1px solid #bbb;padding:9px}.total{text-align:right;margin-top:16px;font-weight:bold}.sign{display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:70px}.line{border-top:1px solid #999;padding-top:7px;text-align:center}</style></head><body><div class="delivery-note"><h1>CARBONERP — SEVK İRSALİYESİ</h1><div>Belge No: <b>${no}</b></div><div class="meta"><div><b>Müşteri</b><br>${esc(c.name||'')}</div><div><b>Tarih</b><br>${esc(s.sale_date||'')}</div><div><b>Telefon</b><br>${esc(c.phone||'-')}</div><div><b>Adres</b><br>${esc(c.address||'-')}</div></div><table><tr><th>Ürün</th><th>Miktar</th><th>Birim</th></tr>${items.map(i=>`<tr><td>${esc(product?.name||'Mangal Kömürü')}</td><td>${Number(i.quantity||0).toLocaleString('tr-TR')}</td><td>kg</td></tr>`).join('')||`<tr><td>Mangal Kömürü</td><td>${qty.toLocaleString('tr-TR')}</td><td>kg</td></tr>`}</table><div class="total">Toplam miktar: ${qty.toLocaleString('tr-TR')} kg</div><div class="sign"><div class="line">Teslim Eden</div><div class="line">Teslim Alan</div></div></div><script>window.onload=()=>window.print()<\/script></body></html>`);w.document.close()}
+function printDeliveryNote(saleId){const s=(data.sales||[]).find(x=>x.id===saleId);if(!s)return alert('Satış bulunamadı.');const c=(data.customers||[]).find(x=>x.id===s.customer_id)||{};const items=s.sale_items||[];const qty=items.reduce((a,x)=>a+Number(x.quantity||0),0);const w=window.open('','_blank');if(!w)return;const no=String(s.id).slice(0,8).toUpperCase();w.document.write(`<html><head><title>İrsaliye ${no}</title><style>@page{size:A4;margin:15mm}body{font-family:Arial,sans-serif;color:#111}.delivery-note h1{font-size:24px;margin:0 0 6px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0}.meta div{border:1px solid #ddd;padding:8px}.delivery-note table{width:100%;border-collapse:collapse;margin-top:18px}.delivery-note th,.delivery-note td{border:1px solid #bbb;padding:9px}.total{text-align:right;margin-top:16px;font-weight:bold}.sign{display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:70px}.line{border-top:1px solid #999;padding-top:7px;text-align:center}</style><style id="carbonerp-v15-sales">
+.sale-fast-card{border:1px solid #d9e6dc;background:#f5fbf7;border-radius:10px;padding:12px}
+#s_customer_search{font-size:16px}
+@media(max-width:600px){.formgrid{grid-template-columns:1fr!important}.actions .btn{flex:1}.panel{padding:14px}}
+</style>
+</head><body><div class="delivery-note"><h1>CARBONERP — SEVK İRSALİYESİ</h1><div>Belge No: <b>${no}</b></div><div class="meta"><div><b>Müşteri</b><br>${esc(c.name||'')}</div><div><b>Tarih</b><br>${esc(s.sale_date||'')}</div><div><b>Telefon</b><br>${esc(c.phone||'-')}</div><div><b>Adres</b><br>${esc(c.address||'-')}</div></div><table><tr><th>Ürün</th><th>Miktar</th><th>Birim</th></tr>${items.map(i=>`<tr><td>${esc(product?.name||'Mangal Kömürü')}</td><td>${Number(i.quantity||0).toLocaleString('tr-TR')}</td><td>kg</td></tr>`).join('')||`<tr><td>Mangal Kömürü</td><td>${qty.toLocaleString('tr-TR')}</td><td>kg</td></tr>`}</table><div class="total">Toplam miktar: ${qty.toLocaleString('tr-TR')} kg</div><div class="sign"><div class="line">Teslim Eden</div><div class="line">Teslim Alan</div></div></div><script>window.onload=()=>window.print()<\/script></body></html>`);w.document.close()}
 function previewSale(){
  let q=+s_kg.value||0,p=+s_price.value||0,vr=+s_vat.value||0;
  let v=vatCalc(q*p,vr);
