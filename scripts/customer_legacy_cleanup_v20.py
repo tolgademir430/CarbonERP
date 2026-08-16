@@ -1,13 +1,8 @@
 from pathlib import Path
+import re
 
 p=Path('index.html')
 s=p.read_text(encoding='utf-8')
-replacements=[
-    '<script>window.onload=()=>window.print()<\\/script>',
-    '<script>window.onload=()=>window.print()</script>',
-    '<script src="sales-fix.js"><\\/script>',
-    '<script src="sales-fix.js"></script>',
-]
-for old in replacements:
-    s=s.replace(old,'')
+s=re.sub(r'<script>window\.onload=\(\)=>window\.print\(\)<.*?/script>', '', s)
+s=re.sub(r'<script\s+src=["\']sales-fix\.js["\']>.*?/script>', '', s)
 p.write_text(s,encoding='utf-8')
