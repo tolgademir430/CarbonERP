@@ -20,8 +20,12 @@ else:
         if embedded:
             errors.append(f'unescaped </script> inside application JavaScript: {embedded}')
         js=region[len('<script>'):last_close]
+        # Embedded print-window HTML can legitimately contain <script> tags inside
+        # template literals. Remove only those HTML tags for the JS parser; the
+        # separate embedded-closer check above still protects the real document.
+        js_for_check=re.sub(r'</?script(?:\s[^>]*)?>','',js,flags=re.I)
         with tempfile.NamedTemporaryFile('w',suffix='.js',encoding='utf-8',delete=False) as f:
-            f.write(js); name=f.name
+            f.write(js_for_check); name=f.name
         r=subprocess.run(['node','--check',name],capture_output=True,text=True)
         if r.returncode:
             errors.append('application JavaScript syntax error: '+r.stderr.strip())
