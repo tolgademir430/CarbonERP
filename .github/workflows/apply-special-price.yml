@@ -1,0 +1,144 @@
+name: CarbonERP customer special price
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-special-price.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Inject customer special price behavior
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          marker = '<script id="carbonerp-customer-special-price-v20">'
+          if marker in s:
+              print('Special price module already present')
+              raise SystemExit(0)
+          module = r'''<script id="carbonerp-customer-special-price-v20">
+          (function(){
+            'use strict';
+            function findLabelText(el){
+              const field = el && el.closest ? el.closest('.field') : null;
+              return field ? String(field.querySelector('label')?.textContent || '').toLowerCase() : '';
+            }
+            function findCustomerSelect(root){
+              const selects = Array.from((root || document).querySelectorAll('select'));
+              return selects.find(function(s){
+                const id = String(s.id || '').toLowerCase();
+                const name = String(s.name || '').toLowerCase();
+                const label = findLabelText(s);
+                return id.includes('customer') || name.includes('customer') || label.includes('müşteri');
+              }) || null;
+            }
+            function findPriceInput(root){
+              const inputs = Array.from((root || document).querySelectorAll('input'));
+              return inputs.find(function(i){
+                const id = String(i.id || '').toLowerCase();
+                const name = String(i.name || '').toLowerCase();
+                const label = findLabelText(i);
+                if(id.includes('special_price') || name.includes('special_price') || label.includes('iskonto') || label.includes('kdv')) return false;
+                return id.includes('unit_price') || id.includes('price') || name.includes('unit_price') || name.includes('price') || label.includes('birim fiyat') || label.includes('kg fiyat') || label === 'fiyat';
+              }) || null;
+            }
+            function setPrice(input, value){
+              if(!input) return;
+              const n = Number(value);
+              if(!Number.isFinite(n) || n <= 0) return;
+              if(input.dataset.carbonerpSpecialApplied !== '1') input.dataset.carbonerpBasePrice = input.value;
+              input.dataset.carbonerpSpecialApplied = '1';
+              input.dataset.carbonerpSpecialValue = String(n);
+              input.value = String(n);
+              input.dispatchEvent(new Event('input',{bubbles:true}));
+              input.dispatchEvent(new Event('change',{bubbles:true}));
+              const field = input.closest('.field');
+              if(field){
+                let note = field.querySelector('.carbonerp-special-price-note');
+                if(!note){ note=document.createElement('div'); note.className='carbonerp-special-price-note'; note.style.cssText='font-size:12px;color:#16734a;margin-top:5px;font-weight:600'; field.appendChild(note); }
+                note.textContent='✓ Müşteriye özel fiyat otomatik uygulandı';
+              }
+            }
+            function clearPrice(input){
+              if(!input || input.dataset.carbonerpSpecialApplied !== '1') return;
+              const base = input.dataset.carbonerpBasePrice;
+              if(base !== undefined) input.value = base;
+              delete input.dataset.carbonerpSpecialApplied;
+              delete input.dataset.carbonerpSpecialValue;
+              delete input.dataset.carbonerpBasePrice;
+              input.dispatchEvent(new Event('input',{bubbles:true}));
+              input.dispatchEvent(new Event('change',{bubbles:true}));
+              const note = input.closest('.field')?.querySelector('.carbonerp-special-price-note');
+              if(note) note.remove();
+            }
+            function apply(root){
+              const scope = root || document.getElementById('modalbox') || document;
+              const customerSelect = findCustomerSelect(scope);
+              const priceInput = findPriceInput(scope);
+              if(!customerSelect || !priceInput) return;
+              const customer = (window.data?.customers || []).find(function(c){return String(c.id) === String(customerSelect.value);});
+              const special = Number(customer?.special_price);
+              if(Number.isFinite(special) && special > 0) setPrice(priceInput, special);
+              else clearPrice(priceInput);
+            }
+            function bind(root){
+              const scope = root || document.getElementById('modalbox') || document;
+              const customerSelect = findCustomerSelect(scope);
+              if(customerSelect && customerSelect.dataset.carbonerpSpecialBound !== '1'){
+                customerSelect.dataset.carbonerpSpecialBound='1';
+                customerSelect.addEventListener('change', function(){ setTimeout(function(){apply(scope)},0); });
+              }
+              apply(scope);
+            }
+            const observer = new MutationObserver(function(){
+              const box=document.getElementById('modalbox');
+              if(box) bind(box);
+            });
+            observer.observe(document.body,{childList:true,subtree:true});
+            document.addEventListener('input',function(e){
+              const t=e.target;
+              if(t && t.dataset && t.dataset.carbonerpSpecialApplied==='1' && String(e.inputType||'').toLowerCase() !== ''){
+                if(String(t.value) !== String(t.dataset.carbonerpSpecialValue)){
+                  delete t.dataset.carbonerpSpecialApplied;
+                  const note=t.closest('.field')?.querySelector('.carbonerp-special-price-note');
+                  if(note) note.remove();
+                }
+              }
+            },true);
+            window.CarbonERPCustomerSpecialPrice={apply:apply,bind:bind};
+          })();
+          </script>'''
+          s = s.replace('</body>', module + '\n</body>')
+          p.write_text(s, encoding='utf-8')
+
+      - name: Validate
+        run: |
+          test -f index.html
+          grep -q 'carbonerp-customer-special-price-v20' index.html
+          grep -q 'special_price' index.html
+          node --check <(python - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('index.html').read_text(encoding='utf-8')
+          blocks=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S|re.I)
+          print('\n'.join(blocks))
+          PY
+          )
+
+      - name: Commit generated change
+        run: |
+          git config user.name 'CarbonERP Bot'
+          git config user.email 'carbonerp-bot@users.noreply.github.com'
+          git add index.html
+          git diff --cached --quiet || git commit -m 'CarbonERP V20: auto-apply customer special kg price'
+          git push
