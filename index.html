@@ -182,7 +182,8 @@ function printCustomerStatement(customerId){
 #s_customer_search{font-size:16px}
 @media(max-width:600px){.formgrid{grid-template-columns:1fr!important}.actions .btn{flex:1}.panel{padding:14px}}
 </style>
-</head><body><h1>CarbonERP - Cari Ekstre</h1><div><b>Müşteri:</b> ${esc(c.name||'')}</div><table><tr><th>Tarih</th><th>İşlem</th><th>Belge</th><th>İşlem Tutarı</th><th>Kalan</th></tr>${rows||'<tr><td colspan="5">Kayıt yok</td></tr>'}</table><div class="total">Toplam Açık Bakiye: ${money(sales.reduce((a,s)=>a+saleOutstanding(s),0))}</div><script>window.onload=()=>window.print()<\/script></body></html>`);
+</head><body><h1>CarbonERP - Cari Ekstre</h1><div><b>Müşteri:</b> ${esc(c.name||'')}</div><table><tr><th>Tarih</th><th>İşlem</th><th>Belge</th><th>İşlem Tutarı</th><th>Kalan</th></tr>${rows||'<tr><td colspan="5">Kayıt yok</td></tr>'}</table><div class="total">Toplam Açık Bakiye: ${money(sales.reduce((a,s)=>a+saleOutstanding(s),0))}</div><script>window.onload=()=>window.print()<\/script><script src="sales-fix.js"></script>
+</body></html>`);
   w.document.close();
 }
 function dashboard(){
