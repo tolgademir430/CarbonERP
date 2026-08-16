@@ -38,11 +38,11 @@ new_sales = r'''function sales(){
      <div class="field"><label>Tarih</label><input id="s_date" type="date" value="${today()}"></div>
      <div class="field"><label>Ürün</label><select id="s_product">${product?`<option value="${product.id}">${esc(product.name||'Mangal Kömürü')}</option>`:'<option value="">Ürün seçin</option>'}</select></div>
      <div class="field"><label>KDV Oranı (%)</label><select id="s_vat" onchange="previewSale()">${vatOptions(20)}</select></div>
-     <div class="field"><label>Ödeme</label><select id="s_payment" onchange="toggleSaleDue()"><option>Peşin</option><option>Havale/EFT</option><option>Kredi Kartı</option><option>Vadeli</option></select></div>
+     <div class="field"><label>Ödeme</label><select id="s_payment" onchange="previewSale()"><option>Peşin</option><option>Havale/EFT</option><option>Kredi Kartı</option><option>Vadeli</option></select></div>
      <div class="field" id="dueWrap" style="display:none;grid-column:1/-1"><label>Vade Tarihi</label><input id="s_due" type="date"></div>
     </div>
    </div>
-   <div class="panel" style="margin-top:18px"><h2>Özet</h2><div>Net (KDV Hariç): <b id="spBase">${money(5000)}</b></div><div style="margin-top:8px">KDV: <b id="spVat">${money(1000)}</b></div><hr><div class="value" id="spTotal">${money(6000)}</div><div class="positive" id="spProfit" style="margin-top:8px"></div><div class="status">Eski bakiye: <b id="spOldBalance">${money(c0?customerBalance(c0.id):0)}</b></div><div class="status">Yeni bakiye: <b id="spNewBalance">${money(c0?customerBalance(c0.id)+6000:6000)}</b></div></div>
+   <div class="panel" style="margin-top:18px"><h2>Özet</h2><div>Net (KDV Hariç): <b id="spBase">${money(5000)}</b></div><div style="margin-top:8px">KDV: <b id="spVat">${money(1000)}</b></div><hr><div class="value" id="spTotal">${money(6000)}</div><div class="positive" id="spProfit" style="margin-top:8px"></div><div class="status">Eski bakiye: <b id="spOldBalance">${money(c0?customerBalance(c0.id):0)}</b></div><div class="status">Yeni bakiye: <b id="spNewBalance">${money(c0?customerBalance(c0.id):0)}</b></div></div>
   </div>
  </div>
  <div class="panel" style="margin-top:18px"><div class="actions" style="justify-content:flex-start;margin-top:0"><label style="display:flex;align-items:center;gap:8px"><input id="s_make_note" type="checkbox" checked> İrsaliye oluştur</label><button class="btn secondary" onclick="clearSaleForm()">Temizle</button><button class="btn primary" onclick="saveSale()">Satışı Kaydet</button></div></div>
@@ -54,6 +54,26 @@ function updateSaleCustomerInfo(){const el=document.getElementById('saleCustomer
 function setSaleKg(q){const el=document.getElementById('s_kg');if(el){el.value=q;previewSale()}}
 function toggleSaleDue(){const p=document.getElementById('s_payment'),w=document.getElementById('dueWrap');if(w&&p)w.style.display=p.value==='Vadeli'?'block':'none'}
 function clearSaleForm(){['s_customer_search','s_kg','s_price','s_due'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=id==='s_kg'?'100':id==='s_price'?'50':''});const p=document.getElementById('s_payment');if(p)p.value='Peşin';toggleSaleDue();previewSale()}
+function previewSale(){
+ const q=Number(document.getElementById('s_kg')?.value||0);
+ const p=Number(document.getElementById('s_price')?.value||0);
+ const vr=Number(document.getElementById('s_vat')?.value||0);
+ const payment=document.getElementById('s_payment')?.value||'Peşin';
+ const customerId=document.getElementById('s_customer')?.value;
+ const base=q*p, vat=base*vr/100, total=base+vat;
+ const oldBalance=customerId ? Number(customerBalance(customerId)||0) : 0;
+ const newBalance=payment==='Vadeli' ? oldBalance+total : oldBalance;
+ const cost=q*Number(weightedCost()||0);
+ const profit=base-cost;
+ const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text};
+ set('spBase',money(base));
+ set('spVat',money(vat));
+ set('spTotal',money(total));
+ set('spProfit','Brüt kâr: '+money(profit)+' (KDV hariç)');
+ set('spOldBalance',money(oldBalance));
+ set('spNewBalance',money(newBalance));
+ toggleSaleDue();
+}
 '''
 s = s[:start] + new_sales + s[end:]
 
@@ -76,4 +96,4 @@ if main_start >= 0 and main_end > main_start:
     s = s[:main_start] + js + s[main_end:]
 
 p.write_text(s,encoding='utf-8')
-print('V15 sales UI applied and script-tag safety fix applied')
+print('V15 sales UI applied: peşin/vadeli cari preview and script-tag safety fix applied')
