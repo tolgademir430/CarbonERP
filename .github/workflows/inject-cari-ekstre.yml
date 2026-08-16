@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/cari-ekstre-v20.js'
+      - '.github/workflows/inject-cari-ekstre.yml'
 permissions:
   contents: write
 jobs:
@@ -32,7 +33,6 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
           s=Path('scripts/cari-ekstre-v20.js').read_text(encoding='utf-8')
           required=['customerDetail','renderCustomerStatement','printCustomerStatement','CARBONERP_CARI_EKSTRE_V20']
           missing=[x for x in required if x not in s]
