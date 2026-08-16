@@ -213,7 +213,191 @@ function printCustomerStatement(customerId){
  window.saveCustomerEdit=async function(id){try{const payload={name:val('ce_name'),customer_code:val('ce_code')||null,contact_person:val('ce_contact')||null,customer_type:val('ce_type')||'Diğer',phone:val('ce_phone')||null,alternate_phone:val('ce_alt')||null,whatsapp:val('ce_whatsapp')||null,email:val('ce_email')||null,website:val('ce_website')||null,contact_preference:val('ce_pref')||null,tax_number:val('ce_tax')||null,tax_office:val('ce_office')||null,invoice_title:val('ce_invoice_title')||null,e_invoice_type:val('ce_einvoice')||null,city:val('ce_city')||null,district:val('ce_district')||null,postal_code:val('ce_postal')||null,invoice_address:val('ce_invoice_address')||null,delivery_address:val('ce_delivery_address')||null,delivery_city:val('ce_delivery_city')||null,delivery_district:val('ce_delivery_district')||null,delivery_region:val('ce_delivery_region')||null,delivery_days:val('ce_delivery_days')||null,delivery_time:val('ce_delivery_time')||null,delivery_notes:val('ce_delivery_notes')||null,default_payment_type:val('ce_payment')||'Vadeli',default_due_days:Number(val('ce_due')||0),credit_limit:Number(val('ce_limit')||0),discount_rate:Number(val('ce_discount')||0),customer_group:val('ce_group')||null,price_group:val('ce_price_group')||null,special_price:val('ce_special')===''?null:Number(val('ce_special')),minimum_order_kg:Number(val('ce_min_kg')||0),sales_representative:val('ce_rep')||null,notes:val('ce_notes')||null,updated_at:new Date().toISOString(),updated_by:currentUser?.id||null};if(!payload.name)throw new Error('Müşteri adı zorunludur.');const q=await client.from('customers').update(payload).eq('id',id);if(q.error)throw q.error;await loadData();customerDetail(id)}catch(e){alert(msg(e))}};
  window.openCustomer=function(){modalbox.innerHTML='<h2>Yeni Müşteri</h2><div class="formgrid">'+inp('cn_name','İşletme / Müşteri Adı')+inp('cn_code','Müşteri Kodu')+inp('cn_contact','Yetkili Kişi')+sel('cn_type','Müşteri Tipi','Restaurant',['Restaurant','Kasap','Market','Diğer'])+inp('cn_phone','Telefon','','tel')+inp('cn_alt','Alternatif Telefon','','tel')+inp('cn_whatsapp','WhatsApp','','tel')+inp('cn_email','E-posta','','email')+inp('cn_tax','Vergi No')+inp('cn_office','Vergi Dairesi')+inp('cn_invoice_title','Fatura Unvanı')+sel('cn_einvoice','E-Fatura','E-Arşiv',['E-Arşiv','E-Fatura','Kağıt Fatura'])+inp('cn_city','İl')+inp('cn_district','İlçe')+inp('cn_postal','Posta Kodu')+inp('cn_invoice_address','Fatura Adresi')+inp('cn_delivery_address','Teslimat Adresi')+inp('cn_delivery_city','Teslimat İl')+inp('cn_delivery_district','Teslimat İlçe')+inp('cn_delivery_region','Teslimat Bölgesi')+inp('cn_delivery_days','Teslimat Günleri')+inp('cn_delivery_time','Teslimat Saati')+inp('cn_delivery_notes','Teslimat Notu')+sel('cn_payment','Varsayılan Ödeme','Vadeli',['Peşin','Havale/EFT','Kredi Kartı','Vadeli'])+inp('cn_due','Vade Günü','0','number')+inp('cn_limit','Kredi Limiti','0','number')+inp('cn_discount','İskonto %','0','number')+inp('cn_group','Müşteri Grubu')+inp('cn_price_group','Özel Fiyat Grubu')+inp('cn_special','Özel Kg Fiyatı','','number')+inp('cn_min_kg','Minimum Sipariş Kg','0','number')+inp('cn_rep','Satış Temsilcisi')+inp('cn_notes','Notlar')+'</div><div class="actions"><button class="btn secondary" onclick="closeModal()">İptal</button><button class="btn primary" onclick="saveCustomerClean()">Kaydet</button></div>';modal.classList.add('open')};
  window.saveCustomerClean=async function(){try{const payload={name:val('cn_name'),customer_code:val('cn_code')||null,contact_person:val('cn_contact')||null,customer_type:val('cn_type')||'Diğer',phone:val('cn_phone')||null,alternate_phone:val('cn_alt')||null,whatsapp:val('cn_whatsapp')||null,email:val('cn_email')||null,tax_number:val('cn_tax')||null,tax_office:val('cn_office')||null,invoice_title:val('cn_invoice_title')||null,e_invoice_type:val('cn_einvoice')||null,city:val('cn_city')||null,district:val('cn_district')||null,postal_code:val('cn_postal')||null,invoice_address:val('cn_invoice_address')||null,delivery_address:val('cn_delivery_address')||null,delivery_city:val('cn_delivery_city')||null,delivery_district:val('cn_delivery_district')||null,delivery_region:val('cn_delivery_region')||null,delivery_days:val('cn_delivery_days')||null,delivery_time:val('cn_delivery_time')||null,delivery_notes:val('cn_delivery_notes')||null,default_payment_type:val('cn_payment')||'Vadeli',default_due_days:Number(val('cn_due')||0),credit_limit:Number(val('cn_limit')||0),discount_rate:Number(val('cn_discount')||0),customer_group:val('cn_group')||null,price_group:val('cn_price_group')||null,special_price:val('cn_special')===''?null:Number(val('cn_special')),minimum_order_kg:Number(val('cn_min_kg')||0),sales_representative:val('cn_rep')||null,notes:val('cn_notes')||null,is_active:true,updated_at:new Date().toISOString(),updated_by:currentUser?.id||null};if(!payload.name)throw new Error('Müşteri adı zorunludur.');const q=await client.from('customers').insert(payload);if(q.error)throw q.error;await loadData();closeModal();show('customers')}catch(e){alert(msg(e))}};
- window.printCustomerStatement=function(id){const c=(data.customers||[]).find(function(x){return x.id===id});if(!c)return;const st=stats(id),w=window.open('','_blank');if(!w)return;w.document.write('<html><head><title>'+E(c.name)+' Cari Ekstre</title><style>body{font-family:Arial}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px}th{background:#f3f3f3}.summary{display:flex;gap:10px}.box{border:1px solid #ddd;padding:10px}</style></head><body><h1>'+E(c.name)+'</h1><div class="summary"><div class="box">Satış: '+M(st.sales)+'</div><div class="box">Tahsilat: '+M(st.cols)+'</div><div class="box">Cari: '+M(st.open)+'</div><div class="box">Vadesi Geçmiş: '+M(st.overdue)+'</div></div>'+statement(id)+'</body></html>');w.document.close();setTimeout(function(){w.print()},150)};
+ window.printCustomerStatement=function(id){const c=(data.customers||[]).find(function(x){return x.id===id});if(!c)return;const st=stats(id),w=window.open('','_blank');if(!w)return;w.document.write('<html><head><title>'+E(c.name)+' Cari Ekstre</title><style>body{font-family:Arial}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px}th{background:#f3f3f3}.summary{display:flex;gap:10px}.box{border:1px solid #ddd;padding:10px}</style></head><body><h1>'+E(c.name)+'</h1><div class="summary"><div class="box">Satış: '+M(st.sales)+'</div><div class="box">Tahsilat: '+M(st.cols)+'</div><div class="box">Cari: '+M(st.open)+'</div><div class="box">Vadesi Geçmiş: '+M(st.overdue)+'</div></div>'+statement(id)+'<script id="carbonerp-customer-special-price-v20">
+(function(){
+  'use strict';
+  function findLabelText(el){
+    const field = el && el.closest ? el.closest('.field') : null;
+    return field ? String(field.querySelector('label')?.textContent || '').toLowerCase() : '';
+  }
+  function findCustomerSelect(root){
+    const selects = Array.from((root || document).querySelectorAll('select'));
+    return selects.find(function(s){
+      const id = String(s.id || '').toLowerCase();
+      const name = String(s.name || '').toLowerCase();
+      const label = findLabelText(s);
+      return id.includes('customer') || name.includes('customer') || label.includes('müşteri');
+    }) || null;
+  }
+  function findPriceInput(root){
+    const inputs = Array.from((root || document).querySelectorAll('input'));
+    return inputs.find(function(i){
+      const id = String(i.id || '').toLowerCase();
+      const name = String(i.name || '').toLowerCase();
+      const label = findLabelText(i);
+      if(id.includes('special_price') || name.includes('special_price') || label.includes('iskonto') || label.includes('kdv')) return false;
+      return id.includes('unit_price') || id.includes('price') || name.includes('unit_price') || name.includes('price') || label.includes('birim fiyat') || label.includes('kg fiyat') || label === 'fiyat';
+    }) || null;
+  }
+  function setPrice(input, value){
+    if(!input) return;
+    const n = Number(value);
+    if(!Number.isFinite(n) || n <= 0) return;
+    if(input.dataset.carbonerpSpecialApplied !== '1') input.dataset.carbonerpBasePrice = input.value;
+    input.dataset.carbonerpSpecialApplied = '1';
+    input.dataset.carbonerpSpecialValue = String(n);
+    input.value = String(n);
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    const field = input.closest('.field');
+    if(field){
+      let note = field.querySelector('.carbonerp-special-price-note');
+      if(!note){ note=document.createElement('div'); note.className='carbonerp-special-price-note'; note.style.cssText='font-size:12px;color:#16734a;margin-top:5px;font-weight:600'; field.appendChild(note); }
+      note.textContent='✓ Müşteriye özel fiyat otomatik uygulandı';
+    }
+  }
+  function clearPrice(input){
+    if(!input || input.dataset.carbonerpSpecialApplied !== '1') return;
+    const base = input.dataset.carbonerpBasePrice;
+    if(base !== undefined) input.value = base;
+    delete input.dataset.carbonerpSpecialApplied;
+    delete input.dataset.carbonerpSpecialValue;
+    delete input.dataset.carbonerpBasePrice;
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    const note = input.closest('.field')?.querySelector('.carbonerp-special-price-note');
+    if(note) note.remove();
+  }
+  function apply(root){
+    const scope = root || document.getElementById('modalbox') || document;
+    const customerSelect = findCustomerSelect(scope);
+    const priceInput = findPriceInput(scope);
+    if(!customerSelect || !priceInput) return;
+    const customer = (window.data?.customers || []).find(function(c){return String(c.id) === String(customerSelect.value);});
+    const special = Number(customer?.special_price);
+    if(Number.isFinite(special) && special > 0) setPrice(priceInput, special);
+    else clearPrice(priceInput);
+  }
+  function bind(root){
+    const scope = root || document.getElementById('modalbox') || document;
+    const customerSelect = findCustomerSelect(scope);
+    if(customerSelect && customerSelect.dataset.carbonerpSpecialBound !== '1'){
+      customerSelect.dataset.carbonerpSpecialBound='1';
+      customerSelect.addEventListener('change', function(){ setTimeout(function(){apply(scope)},0); });
+    }
+    apply(scope);
+  }
+  const observer = new MutationObserver(function(){
+    const box=document.getElementById('modalbox');
+    if(box) bind(box);
+  });
+  observer.observe(document.body,{childList:true,subtree:true});
+  document.addEventListener('input',function(e){
+    const t=e.target;
+    if(t && t.dataset && t.dataset.carbonerpSpecialApplied==='1' && String(e.inputType||'').toLowerCase() !== ''){
+      if(String(t.value) !== String(t.dataset.carbonerpSpecialValue)){
+        delete t.dataset.carbonerpSpecialApplied;
+        const note=t.closest('.field')?.querySelector('.carbonerp-special-price-note');
+        if(note) note.remove();
+      }
+    }
+  },true);
+  window.CarbonERPCustomerSpecialPrice={apply:apply,bind:bind};
+})();
+</script>
+</body></html>');w.document.close();setTimeout(function(){w.print()},150)};
+})();
+</script>
+<script id="carbonerp-customer-special-price-v20">
+(function(){
+  'use strict';
+  function findLabelText(el){
+    const field = el && el.closest ? el.closest('.field') : null;
+    return field ? String(field.querySelector('label')?.textContent || '').toLowerCase() : '';
+  }
+  function findCustomerSelect(root){
+    const selects = Array.from((root || document).querySelectorAll('select'));
+    return selects.find(function(s){
+      const id = String(s.id || '').toLowerCase();
+      const name = String(s.name || '').toLowerCase();
+      const label = findLabelText(s);
+      return id.includes('customer') || name.includes('customer') || label.includes('müşteri');
+    }) || null;
+  }
+  function findPriceInput(root){
+    const inputs = Array.from((root || document).querySelectorAll('input'));
+    return inputs.find(function(i){
+      const id = String(i.id || '').toLowerCase();
+      const name = String(i.name || '').toLowerCase();
+      const label = findLabelText(i);
+      if(id.includes('special_price') || name.includes('special_price') || label.includes('iskonto') || label.includes('kdv')) return false;
+      return id.includes('unit_price') || id.includes('price') || name.includes('unit_price') || name.includes('price') || label.includes('birim fiyat') || label.includes('kg fiyat') || label === 'fiyat';
+    }) || null;
+  }
+  function setPrice(input, value){
+    if(!input) return;
+    const n = Number(value);
+    if(!Number.isFinite(n) || n <= 0) return;
+    if(input.dataset.carbonerpSpecialApplied !== '1') input.dataset.carbonerpBasePrice = input.value;
+    input.dataset.carbonerpSpecialApplied = '1';
+    input.dataset.carbonerpSpecialValue = String(n);
+    input.value = String(n);
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    const field = input.closest('.field');
+    if(field){
+      let note = field.querySelector('.carbonerp-special-price-note');
+      if(!note){ note=document.createElement('div'); note.className='carbonerp-special-price-note'; note.style.cssText='font-size:12px;color:#16734a;margin-top:5px;font-weight:600'; field.appendChild(note); }
+      note.textContent='✓ Müşteriye özel fiyat otomatik uygulandı';
+    }
+  }
+  function clearPrice(input){
+    if(!input || input.dataset.carbonerpSpecialApplied !== '1') return;
+    const base = input.dataset.carbonerpBasePrice;
+    if(base !== undefined) input.value = base;
+    delete input.dataset.carbonerpSpecialApplied;
+    delete input.dataset.carbonerpSpecialValue;
+    delete input.dataset.carbonerpBasePrice;
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    const note = input.closest('.field')?.querySelector('.carbonerp-special-price-note');
+    if(note) note.remove();
+  }
+  function apply(root){
+    const scope = root || document.getElementById('modalbox') || document;
+    const customerSelect = findCustomerSelect(scope);
+    const priceInput = findPriceInput(scope);
+    if(!customerSelect || !priceInput) return;
+    const customer = (window.data?.customers || []).find(function(c){return String(c.id) === String(customerSelect.value);});
+    const special = Number(customer?.special_price);
+    if(Number.isFinite(special) && special > 0) setPrice(priceInput, special);
+    else clearPrice(priceInput);
+  }
+  function bind(root){
+    const scope = root || document.getElementById('modalbox') || document;
+    const customerSelect = findCustomerSelect(scope);
+    if(customerSelect && customerSelect.dataset.carbonerpSpecialBound !== '1'){
+      customerSelect.dataset.carbonerpSpecialBound='1';
+      customerSelect.addEventListener('change', function(){ setTimeout(function(){apply(scope)},0); });
+    }
+    apply(scope);
+  }
+  const observer = new MutationObserver(function(){
+    const box=document.getElementById('modalbox');
+    if(box) bind(box);
+  });
+  observer.observe(document.body,{childList:true,subtree:true});
+  document.addEventListener('input',function(e){
+    const t=e.target;
+    if(t && t.dataset && t.dataset.carbonerpSpecialApplied==='1' && String(e.inputType||'').toLowerCase() !== ''){
+      if(String(t.value) !== String(t.dataset.carbonerpSpecialValue)){
+        delete t.dataset.carbonerpSpecialApplied;
+        const note=t.closest('.field')?.querySelector('.carbonerp-special-price-note');
+        if(note) note.remove();
+      }
+    }
+  },true);
+  window.CarbonERPCustomerSpecialPrice={apply:apply,bind:bind};
 })();
 </script>
 </body></html>`);
@@ -330,7 +514,99 @@ function printDeliveryNote(saleId){const s=(data.sales||[]).find(x=>x.id===saleI
 #s_customer_search{font-size:16px}
 @media(max-width:600px){.formgrid{grid-template-columns:1fr!important}.actions .btn{flex:1}.panel{padding:14px}}
 </style>
-<style id="carbonerp-v17-collection">.sale-fast-card{border:1px solid #d9e6dc;background:#f5fbf7;border-radius:10px;padding:12px}@media(max-width:600px){#modalbox .formgrid{grid-template-columns:1fr!important}#modalbox{padding:16px}.modalbox .actions .btn{flex:1}}</style></head><body><div class="delivery-note"><h1>CARBONERP — SEVK İRSALİYESİ</h1><div>Belge No: <b>${no}</b></div><div class="meta"><div><b>Müşteri</b><br>${esc(c.name||'')}</div><div><b>Tarih</b><br>${esc(s.sale_date||'')}</div><div><b>Telefon</b><br>${esc(c.phone||'-')}</div><div><b>Adres</b><br>${esc(c.address||'-')}</div></div><table><tr><th>Ürün</th><th>Miktar</th><th>Birim</th></tr>${items.map(i=>`<tr><td>${esc(product?.name||'Mangal Kömürü')}</td><td>${Number(i.quantity||0).toLocaleString('tr-TR')}</td><td>kg</td></tr>`).join('')||`<tr><td>Mangal Kömürü</td><td>${qty.toLocaleString('tr-TR')}</td><td>kg</td></tr>`}</table><div class="total">Toplam miktar: ${qty.toLocaleString('tr-TR')} kg</div><div class="sign"><div class="line">Teslim Eden</div><div class="line">Teslim Alan</div></div></div></body></html>`);w.document.close()}
+<style id="carbonerp-v17-collection">.sale-fast-card{border:1px solid #d9e6dc;background:#f5fbf7;border-radius:10px;padding:12px}@media(max-width:600px){#modalbox .formgrid{grid-template-columns:1fr!important}#modalbox{padding:16px}.modalbox .actions .btn{flex:1}}</style></head><body><div class="delivery-note"><h1>CARBONERP — SEVK İRSALİYESİ</h1><div>Belge No: <b>${no}</b></div><div class="meta"><div><b>Müşteri</b><br>${esc(c.name||'')}</div><div><b>Tarih</b><br>${esc(s.sale_date||'')}</div><div><b>Telefon</b><br>${esc(c.phone||'-')}</div><div><b>Adres</b><br>${esc(c.address||'-')}</div></div><table><tr><th>Ürün</th><th>Miktar</th><th>Birim</th></tr>${items.map(i=>`<tr><td>${esc(product?.name||'Mangal Kömürü')}</td><td>${Number(i.quantity||0).toLocaleString('tr-TR')}</td><td>kg</td></tr>`).join('')||`<tr><td>Mangal Kömürü</td><td>${qty.toLocaleString('tr-TR')}</td><td>kg</td></tr>`}</table><div class="total">Toplam miktar: ${qty.toLocaleString('tr-TR')} kg</div><div class="sign"><div class="line">Teslim Eden</div><div class="line">Teslim Alan</div></div></div><script id="carbonerp-customer-special-price-v20">
+(function(){
+  'use strict';
+  function findLabelText(el){
+    const field = el && el.closest ? el.closest('.field') : null;
+    return field ? String(field.querySelector('label')?.textContent || '').toLowerCase() : '';
+  }
+  function findCustomerSelect(root){
+    const selects = Array.from((root || document).querySelectorAll('select'));
+    return selects.find(function(s){
+      const id = String(s.id || '').toLowerCase();
+      const name = String(s.name || '').toLowerCase();
+      const label = findLabelText(s);
+      return id.includes('customer') || name.includes('customer') || label.includes('müşteri');
+    }) || null;
+  }
+  function findPriceInput(root){
+    const inputs = Array.from((root || document).querySelectorAll('input'));
+    return inputs.find(function(i){
+      const id = String(i.id || '').toLowerCase();
+      const name = String(i.name || '').toLowerCase();
+      const label = findLabelText(i);
+      if(id.includes('special_price') || name.includes('special_price') || label.includes('iskonto') || label.includes('kdv')) return false;
+      return id.includes('unit_price') || id.includes('price') || name.includes('unit_price') || name.includes('price') || label.includes('birim fiyat') || label.includes('kg fiyat') || label === 'fiyat';
+    }) || null;
+  }
+  function setPrice(input, value){
+    if(!input) return;
+    const n = Number(value);
+    if(!Number.isFinite(n) || n <= 0) return;
+    if(input.dataset.carbonerpSpecialApplied !== '1') input.dataset.carbonerpBasePrice = input.value;
+    input.dataset.carbonerpSpecialApplied = '1';
+    input.dataset.carbonerpSpecialValue = String(n);
+    input.value = String(n);
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    const field = input.closest('.field');
+    if(field){
+      let note = field.querySelector('.carbonerp-special-price-note');
+      if(!note){ note=document.createElement('div'); note.className='carbonerp-special-price-note'; note.style.cssText='font-size:12px;color:#16734a;margin-top:5px;font-weight:600'; field.appendChild(note); }
+      note.textContent='✓ Müşteriye özel fiyat otomatik uygulandı';
+    }
+  }
+  function clearPrice(input){
+    if(!input || input.dataset.carbonerpSpecialApplied !== '1') return;
+    const base = input.dataset.carbonerpBasePrice;
+    if(base !== undefined) input.value = base;
+    delete input.dataset.carbonerpSpecialApplied;
+    delete input.dataset.carbonerpSpecialValue;
+    delete input.dataset.carbonerpBasePrice;
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    const note = input.closest('.field')?.querySelector('.carbonerp-special-price-note');
+    if(note) note.remove();
+  }
+  function apply(root){
+    const scope = root || document.getElementById('modalbox') || document;
+    const customerSelect = findCustomerSelect(scope);
+    const priceInput = findPriceInput(scope);
+    if(!customerSelect || !priceInput) return;
+    const customer = (window.data?.customers || []).find(function(c){return String(c.id) === String(customerSelect.value);});
+    const special = Number(customer?.special_price);
+    if(Number.isFinite(special) && special > 0) setPrice(priceInput, special);
+    else clearPrice(priceInput);
+  }
+  function bind(root){
+    const scope = root || document.getElementById('modalbox') || document;
+    const customerSelect = findCustomerSelect(scope);
+    if(customerSelect && customerSelect.dataset.carbonerpSpecialBound !== '1'){
+      customerSelect.dataset.carbonerpSpecialBound='1';
+      customerSelect.addEventListener('change', function(){ setTimeout(function(){apply(scope)},0); });
+    }
+    apply(scope);
+  }
+  const observer = new MutationObserver(function(){
+    const box=document.getElementById('modalbox');
+    if(box) bind(box);
+  });
+  observer.observe(document.body,{childList:true,subtree:true});
+  document.addEventListener('input',function(e){
+    const t=e.target;
+    if(t && t.dataset && t.dataset.carbonerpSpecialApplied==='1' && String(e.inputType||'').toLowerCase() !== ''){
+      if(String(t.value) !== String(t.dataset.carbonerpSpecialValue)){
+        delete t.dataset.carbonerpSpecialApplied;
+        const note=t.closest('.field')?.querySelector('.carbonerp-special-price-note');
+        if(note) note.remove();
+      }
+    }
+  },true);
+  window.CarbonERPCustomerSpecialPrice={apply:apply,bind:bind};
+})();
+</script>
+</body></html>`);w.document.close()}
 async function saveSale(){try{if(!data.customers.length)return alert('Önce müşteri ekleyin.');let q=+s_kg.value,p=+s_price.value;if(!(q>0&&p>=0))return alert('Kg ve fiyatı kontrol edin.');if(q>data.stockQty)return alert('Yeterli stok yok.');let payment=s_payment.value,due=s_due?.value||null;if(payment==='Vadeli'&&!due)return alert('Vade tarihi girin.');
 let base=q*p,vatRate=+s_vat.value||0,vatAmount=base*vatRate/100,total=base+vatAmount,cost=q*weightedCost();
 let {data:sale,error}=await client.from('sales').insert({customer_id:s_customer.value,warehouse_id:warehouse.id,sale_date:s_date.value,payment_type:payment,due_date:due,subtotal:base,vat_rate:vatRate,vat_amount:vatAmount,total:total,cost_total:cost,created_by:currentUser.id}).select().single();if(error)throw error;let {error:e1}=await client.from('sale_items').insert({sale_id:sale.id,product_id:product.id,quantity:q,unit_price:p,vat_rate:vatRate,line_total:base+vatAmount,unit_cost:weightedCost(),cost_total:cost});if(e1)throw e1;let {error:e2}=await client.from('stock_movements').insert({warehouse_id:warehouse.id,product_id:product.id,movement_date:s_date.value,movement_type:'sale',quantity:-q,unit_cost:weightedCost(),total_cost:-cost,reference_id:sale.id});if(e2)throw e2;if(payment!=='Vadeli'){let {error:e3}=await client.from('collections').insert({customer_id:s_customer.value,sale_id:sale.id,collection_date:s_date.value,payment_type:payment==='Peşin'?'Peşin':payment,amount:total,created_by:currentUser.id});if(e3)throw e3}await loadData();alert('Satış buluta kaydedildi.');show('dashboard')}catch(e){alert(msg(e))}}
@@ -860,7 +1136,99 @@ Tahsilat silinmeyecek; iptal olarak saklanacak.`))return;
     const rows=activeSales().filter(x=>x.customer_id===customerId).map(s=>'<tr><td>'+esc(s.sale_date||'')+'</td><td>Satış</td><td>'+esc(s.invoice_no||s.id||'')+'</td><td>'+money(s.total)+'</td><td>'+money(saleOutstanding(s))+'</td></tr>').join('');
     const total=salesActive().filter(x=>x.customer_id===customerId).reduce((a,s)=>a+saleOutstanding(s),0);
     const w=window.open('','_blank'); if(!w)return;
-    w.document.write('<html><head><title>Cari Ekstre - '+esc(c.name||'')+'</title><style>body{font-family:Arial;padding:30px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}.total{margin-top:20px;font-size:20px;font-weight:bold}</style></head><body><h1>CarbonERP - Cari Ekstre</h1><div><b>Müşteri:</b> '+esc(c.name||'')+'</div><table><tr><th>Tarih</th><th>İşlem</th><th>Belge</th><th>İşlem Tutarı</th><th>Kalan</th></tr>'+(rows||'<tr><td colspan="5">Kayıt yok</td></tr>')+'</table><div class="total">Toplam Açık Bakiye: '+money(total)+'</div></body></html>');
+    w.document.write('<html><head><title>Cari Ekstre - '+esc(c.name||'')+'</title><style>body{font-family:Arial;padding:30px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}.total{margin-top:20px;font-size:20px;font-weight:bold}</style></head><body><h1>CarbonERP - Cari Ekstre</h1><div><b>Müşteri:</b> '+esc(c.name||'')+'</div><table><tr><th>Tarih</th><th>İşlem</th><th>Belge</th><th>İşlem Tutarı</th><th>Kalan</th></tr>'+(rows||'<tr><td colspan="5">Kayıt yok</td></tr>')+'</table><div class="total">Toplam Açık Bakiye: '+money(total)+'</div><script id="carbonerp-customer-special-price-v20">
+(function(){
+  'use strict';
+  function findLabelText(el){
+    const field = el && el.closest ? el.closest('.field') : null;
+    return field ? String(field.querySelector('label')?.textContent || '').toLowerCase() : '';
+  }
+  function findCustomerSelect(root){
+    const selects = Array.from((root || document).querySelectorAll('select'));
+    return selects.find(function(s){
+      const id = String(s.id || '').toLowerCase();
+      const name = String(s.name || '').toLowerCase();
+      const label = findLabelText(s);
+      return id.includes('customer') || name.includes('customer') || label.includes('müşteri');
+    }) || null;
+  }
+  function findPriceInput(root){
+    const inputs = Array.from((root || document).querySelectorAll('input'));
+    return inputs.find(function(i){
+      const id = String(i.id || '').toLowerCase();
+      const name = String(i.name || '').toLowerCase();
+      const label = findLabelText(i);
+      if(id.includes('special_price') || name.includes('special_price') || label.includes('iskonto') || label.includes('kdv')) return false;
+      return id.includes('unit_price') || id.includes('price') || name.includes('unit_price') || name.includes('price') || label.includes('birim fiyat') || label.includes('kg fiyat') || label === 'fiyat';
+    }) || null;
+  }
+  function setPrice(input, value){
+    if(!input) return;
+    const n = Number(value);
+    if(!Number.isFinite(n) || n <= 0) return;
+    if(input.dataset.carbonerpSpecialApplied !== '1') input.dataset.carbonerpBasePrice = input.value;
+    input.dataset.carbonerpSpecialApplied = '1';
+    input.dataset.carbonerpSpecialValue = String(n);
+    input.value = String(n);
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    const field = input.closest('.field');
+    if(field){
+      let note = field.querySelector('.carbonerp-special-price-note');
+      if(!note){ note=document.createElement('div'); note.className='carbonerp-special-price-note'; note.style.cssText='font-size:12px;color:#16734a;margin-top:5px;font-weight:600'; field.appendChild(note); }
+      note.textContent='✓ Müşteriye özel fiyat otomatik uygulandı';
+    }
+  }
+  function clearPrice(input){
+    if(!input || input.dataset.carbonerpSpecialApplied !== '1') return;
+    const base = input.dataset.carbonerpBasePrice;
+    if(base !== undefined) input.value = base;
+    delete input.dataset.carbonerpSpecialApplied;
+    delete input.dataset.carbonerpSpecialValue;
+    delete input.dataset.carbonerpBasePrice;
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    const note = input.closest('.field')?.querySelector('.carbonerp-special-price-note');
+    if(note) note.remove();
+  }
+  function apply(root){
+    const scope = root || document.getElementById('modalbox') || document;
+    const customerSelect = findCustomerSelect(scope);
+    const priceInput = findPriceInput(scope);
+    if(!customerSelect || !priceInput) return;
+    const customer = (window.data?.customers || []).find(function(c){return String(c.id) === String(customerSelect.value);});
+    const special = Number(customer?.special_price);
+    if(Number.isFinite(special) && special > 0) setPrice(priceInput, special);
+    else clearPrice(priceInput);
+  }
+  function bind(root){
+    const scope = root || document.getElementById('modalbox') || document;
+    const customerSelect = findCustomerSelect(scope);
+    if(customerSelect && customerSelect.dataset.carbonerpSpecialBound !== '1'){
+      customerSelect.dataset.carbonerpSpecialBound='1';
+      customerSelect.addEventListener('change', function(){ setTimeout(function(){apply(scope)},0); });
+    }
+    apply(scope);
+  }
+  const observer = new MutationObserver(function(){
+    const box=document.getElementById('modalbox');
+    if(box) bind(box);
+  });
+  observer.observe(document.body,{childList:true,subtree:true});
+  document.addEventListener('input',function(e){
+    const t=e.target;
+    if(t && t.dataset && t.dataset.carbonerpSpecialApplied==='1' && String(e.inputType||'').toLowerCase() !== ''){
+      if(String(t.value) !== String(t.dataset.carbonerpSpecialValue)){
+        delete t.dataset.carbonerpSpecialApplied;
+        const note=t.closest('.field')?.querySelector('.carbonerp-special-price-note');
+        if(note) note.remove();
+      }
+    }
+  },true);
+  window.CarbonERPCustomerSpecialPrice={apply:apply,bind:bind};
+})();
+</script>
+</body></html>');
     w.document.close();
   };
 
@@ -873,5 +1241,97 @@ Tahsilat silinmeyecek; iptal olarak saklanacak.`))return;
 })();
 </script>
 
+<script id="carbonerp-customer-special-price-v20">
+(function(){
+  'use strict';
+  function findLabelText(el){
+    const field = el && el.closest ? el.closest('.field') : null;
+    return field ? String(field.querySelector('label')?.textContent || '').toLowerCase() : '';
+  }
+  function findCustomerSelect(root){
+    const selects = Array.from((root || document).querySelectorAll('select'));
+    return selects.find(function(s){
+      const id = String(s.id || '').toLowerCase();
+      const name = String(s.name || '').toLowerCase();
+      const label = findLabelText(s);
+      return id.includes('customer') || name.includes('customer') || label.includes('müşteri');
+    }) || null;
+  }
+  function findPriceInput(root){
+    const inputs = Array.from((root || document).querySelectorAll('input'));
+    return inputs.find(function(i){
+      const id = String(i.id || '').toLowerCase();
+      const name = String(i.name || '').toLowerCase();
+      const label = findLabelText(i);
+      if(id.includes('special_price') || name.includes('special_price') || label.includes('iskonto') || label.includes('kdv')) return false;
+      return id.includes('unit_price') || id.includes('price') || name.includes('unit_price') || name.includes('price') || label.includes('birim fiyat') || label.includes('kg fiyat') || label === 'fiyat';
+    }) || null;
+  }
+  function setPrice(input, value){
+    if(!input) return;
+    const n = Number(value);
+    if(!Number.isFinite(n) || n <= 0) return;
+    if(input.dataset.carbonerpSpecialApplied !== '1') input.dataset.carbonerpBasePrice = input.value;
+    input.dataset.carbonerpSpecialApplied = '1';
+    input.dataset.carbonerpSpecialValue = String(n);
+    input.value = String(n);
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    const field = input.closest('.field');
+    if(field){
+      let note = field.querySelector('.carbonerp-special-price-note');
+      if(!note){ note=document.createElement('div'); note.className='carbonerp-special-price-note'; note.style.cssText='font-size:12px;color:#16734a;margin-top:5px;font-weight:600'; field.appendChild(note); }
+      note.textContent='✓ Müşteriye özel fiyat otomatik uygulandı';
+    }
+  }
+  function clearPrice(input){
+    if(!input || input.dataset.carbonerpSpecialApplied !== '1') return;
+    const base = input.dataset.carbonerpBasePrice;
+    if(base !== undefined) input.value = base;
+    delete input.dataset.carbonerpSpecialApplied;
+    delete input.dataset.carbonerpSpecialValue;
+    delete input.dataset.carbonerpBasePrice;
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    const note = input.closest('.field')?.querySelector('.carbonerp-special-price-note');
+    if(note) note.remove();
+  }
+  function apply(root){
+    const scope = root || document.getElementById('modalbox') || document;
+    const customerSelect = findCustomerSelect(scope);
+    const priceInput = findPriceInput(scope);
+    if(!customerSelect || !priceInput) return;
+    const customer = (window.data?.customers || []).find(function(c){return String(c.id) === String(customerSelect.value);});
+    const special = Number(customer?.special_price);
+    if(Number.isFinite(special) && special > 0) setPrice(priceInput, special);
+    else clearPrice(priceInput);
+  }
+  function bind(root){
+    const scope = root || document.getElementById('modalbox') || document;
+    const customerSelect = findCustomerSelect(scope);
+    if(customerSelect && customerSelect.dataset.carbonerpSpecialBound !== '1'){
+      customerSelect.dataset.carbonerpSpecialBound='1';
+      customerSelect.addEventListener('change', function(){ setTimeout(function(){apply(scope)},0); });
+    }
+    apply(scope);
+  }
+  const observer = new MutationObserver(function(){
+    const box=document.getElementById('modalbox');
+    if(box) bind(box);
+  });
+  observer.observe(document.body,{childList:true,subtree:true});
+  document.addEventListener('input',function(e){
+    const t=e.target;
+    if(t && t.dataset && t.dataset.carbonerpSpecialApplied==='1' && String(e.inputType||'').toLowerCase() !== ''){
+      if(String(t.value) !== String(t.dataset.carbonerpSpecialValue)){
+        delete t.dataset.carbonerpSpecialApplied;
+        const note=t.closest('.field')?.querySelector('.carbonerp-special-price-note');
+        if(note) note.remove();
+      }
+    }
+  },true);
+  window.CarbonERPCustomerSpecialPrice={apply:apply,bind:bind};
+})();
+</script>
 </body>
 </html>
