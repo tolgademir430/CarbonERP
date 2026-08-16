@@ -66,6 +66,14 @@ style = r'''<style id="carbonerp-v15-sales">
 if 'id="carbonerp-v15-sales"' not in s:
     s=s.replace('</head>',style+'</head>')
 
+# Critical HTML parser fix: a literal </script> inside a JS template string
+# terminates the enclosing script before JavaScript can finish parsing.
+main_start = s.find('<script>\nconst SUPABASE_URL')
+main_end = s.rfind('</script>')
+if main_start >= 0 and main_end > main_start:
+    js = s[main_start:main_end]
+    js = js.replace('</script>', '<\\/script>')
+    s = s[:main_start] + js + s[main_end:]
+
 p.write_text(s,encoding='utf-8')
-print('V15 sales UI applied')
-# CarbonERP V15 sales trigger validation
+print('V15 sales UI applied and script-tag safety fix applied')
