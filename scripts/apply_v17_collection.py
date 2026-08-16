@@ -6,7 +6,7 @@ end=s.find('function purchases(){', start)
 if start < 0 or end < 0: raise SystemExit('V17 collection markers not found')
 new=r'''function collectionSaleOptions(customerId, selectedSale=null){
  const arr=data.sales.filter(s=>s.customer_id===customerId&&saleOutstanding(s)>0);
- return `<option value="">Cari genel tahsilat</option>`+arr.map(s=>`<option value="${s.id}" ${s.id===selectedSale?'selected':''}>${s.sale_date} · ${money(s.total)} · kalan ${money(saleOutstanding(s))}${s.due_date?' · vade '+s.due_date:''}</option>`).join('');
+ return `<option value="">Cari genel tahsilat (otomatik dağıt)</option>`+arr.map(s=>`<option value="${s.id}" ${s.id===selectedSale?'selected':''}>${s.sale_date} · ${money(s.total)} · kalan ${money(saleOutstanding(s))}${s.due_date?' · vade '+s.due_date:''}</option>`).join('');
 }
 function collectionCustomerOpenBalance(customerId){return Math.max(0,customerBalance(customerId));}
 function updateCollectionHint(){
@@ -17,7 +17,7 @@ function updateCollectionHint(){
  if(!hint)return;
  const max=saleId?saleOutstanding(data.sales.find(s=>s.id===saleId)):collectionCustomerOpenBalance(id);
  if(amount){amount.max=max.toFixed(2);if(Number(amount.value)>max)amount.value=max.toFixed(2);}
- hint.innerHTML=saleId?`Bu satışın kalan bakiyesi: <b>${money(max)}</b>. Tahsilat bu tutarı aşamaz.`:`Müşterinin toplam açık cari bakiyesi: <b>${money(max)}</b>.`;
+ hint.innerHTML=saleId?`Bu satışın kalan bakiyesi: <b>${money(max)}</b>. Tahsilat bu tutarı aşamaz.`:`Genel tahsilat, en eski açık satıştan başlayarak otomatik dağıtılır. Açık cari: <b>${money(max)}</b>.`;
 }
 function openCollection(){const cid=data.customers[0]?.id||'';openCollectionForCustomer(cid)}
 function openCollectionForCustomer(cid, selectedSale=null){
@@ -35,9 +35,37 @@ function refreshCollectionSales(){const c=col_c.value;document.getElementById('c
 function openCollectionForSale(saleId){const s=data.sales.find(x=>x.id===saleId);if(s)openCollectionForCustomer(s.customer_id,saleId)}
 async function addCollection(){try{
  const id=col_c.value,a=+col_amount.value,saleId=col_sale.value||null;if(!(a>0))return alert('Tahsilat tutarı girin.');
- const sale=saleId?data.sales.find(s=>s.id===saleId):null;if(saleId&&!sale)return alert('Satış bulunamadı.');
- const max=sale?saleOutstanding(sale):collectionCustomerOpenBalance(id);if(max<=0)return alert('Bu müşteri için açık bakiye bulunmuyor.');if(a>max+0.0001)return alert('Tahsilat kalan bakiyeyi aşamaz. Maksimum: '+money(max));
- const {error}=await client.from('collections').insert({customer_id:id,sale_id:saleId,collection_date:col_date.value,payment_type:col_method.value,amount:a,created_by:currentUser.id});if(error)throw error;
+ if(!id)return alert('Müşteri seçin.');
+ const collectionDate=col_date.value,paymentType=col_method.value;
+ if(saleId){
+   const sale=data.sales.find(s=>s.id===saleId);
+   if(!sale)return alert('Satış bulunamadı.');
+   const max=saleOutstanding(sale);
+   if(max<=0)return alert('Bu satışta açık bakiye bulunmuyor.');
+   if(a>max+0.0001)return alert('Tahsilat kalan bakiyeyi aşamaz. Maksimum: '+money(max));
+   const {error}=await client.from('collections').insert({customer_id:id,sale_id:saleId,collection_date:collectionDate,payment_type:paymentType,amount:Number(a.toFixed(2)),created_by:currentUser.id});
+   if(error)throw error;
+ }else{
+   // Cari genel tahsilatı FIFO mantığıyla en eski açık satıştan başlayarak dağıt.
+   // Böylece satış bazındaki kalan tutarlar ve Vade Takibi toplamı otomatik güncellenir.
+   const openSales=data.sales.filter(s=>s.customer_id===id&&saleOutstanding(s)>0).sort((a,b)=>{
+     const ad=a.due_date||'9999-12-31',bd=b.due_date||'9999-12-31';
+     return ad.localeCompare(bd)||String(a.sale_date||'').localeCompare(String(b.sale_date||''));
+   });
+   const totalOpen=openSales.reduce((sum,s)=>sum+saleOutstanding(s),0);
+   if(totalOpen<=0)return alert('Bu müşteri için açık bakiye bulunmuyor.');
+   if(a>totalOpen+0.0001)return alert('Tahsilat toplam açık bakiyeyi aşamaz. Maksimum: '+money(totalOpen));
+   let remaining=a;
+   for(const sale of openSales){
+     if(remaining<=0.0001)break;
+     const allocation=Math.min(remaining,saleOutstanding(sale));
+     if(allocation<=0)continue;
+     const {error}=await client.from('collections').insert({customer_id:id,sale_id:sale.id,collection_date:collectionDate,payment_type:paymentType,amount:Number(allocation.toFixed(2)),created_by:currentUser.id});
+     if(error)throw error;
+     remaining-=allocation;
+   }
+   if(remaining>0.01)throw new Error('Tahsilat açık satışlara tam olarak dağıtılamadı.');
+ }
  await loadData();closeModal();show('collections');
 }catch(e){alert(msg(e))}}
 '''
