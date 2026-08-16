@@ -1,0 +1,25 @@
+name: CarbonERP Sales Enhancement
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  enhance:
+    if: ${{ !startsWith(github.event.head_commit.message, 'CarbonERP: apply sales enhancement') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Apply enhancement
+        run: python3 scripts/enhance_sales.py
+      - name: Commit updated app
+        run: |
+          git config user.name "CarbonERP Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet || git commit -m "CarbonERP: apply sales enhancement"
+          git push
