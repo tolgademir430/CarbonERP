@@ -119,7 +119,7 @@ async function login(){
 }
 async function logout(){await client.auth.signOut()}
 client.auth.onAuthStateChange(async (_event,session)=>{
- if(session){currentUser=session.user;loginScreen.style.display='none';appShell.style.display='block';userEmail.textContent=session.user.email;await loadData();await repairLegacyGeneralCollections();await loadData();show('dashboard')}
+ if(session){currentUser=session.user;loginScreen.style.display='none';appShell.style.display='block';userEmail.textContent=session.user.email;await loadData();await repairLegacyGeneralCollections();await loadData();show(savedPage())}
  else{currentUser=null;appShell.style.display='none';loginScreen.style.display='flex'}
 });
 
@@ -141,7 +141,15 @@ async function loadData(){
  data.stockCost=data.stockMovements.reduce((a,m)=>a+Number(m.total_cost||0),0);
 }
 function nav(page){const pages=['dashboard','sales','customers','collections','due','purchases','expenses','stock','reports'];const labels={dashboard:'Dashboard',sales:'Satış',customers:'Müşteriler',collections:'Tahsilatlar',due:'Vade Takibi',purchases:'Alışlar',expenses:'Giderler',stock:'Stok',reports:'Raporlar'};return pages.map(x=>`<button class="${x===page?'active':''}" onclick="show('${x}')">${labels[x]}</button>`).join('')}
-async function show(page){document.getElementById('nav').innerHTML=nav(page);document.getElementById('app').innerHTML=({dashboard,sales,customers,collections,due,purchases,expenses,stock,reports})[page]()}
+const CARBONERP_PAGES=['dashboard','sales','customers','collections','due','purchases','expenses','stock','reports'];
+function savedPage(){const p=sessionStorage.getItem('carbonerp_current_page');return CARBONERP_PAGES.includes(p)?p:'dashboard'}
+async function show(page){
+  if(!CARBONERP_PAGES.includes(page)) page='dashboard';
+  sessionStorage.setItem('carbonerp_current_page',page);
+  history.replaceState(null,'','#'+page);
+  document.getElementById('nav').innerHTML=nav(page);
+  document.getElementById('app').innerHTML=({dashboard,sales,customers,collections,due,purchases,expenses,stock,reports})[page]();
+}
 function daysLate(d){if(!d)return 0;const a=new Date(d+'T23:59:59'),b=new Date(today()+'T23:59:59');return Math.max(0,Math.floor((b-a)/86400000))}
 function saleCollected(saleId){return data.collections.filter(c=>c.sale_id===saleId).reduce((a,c)=>a+Number(c.amount||0),0)}
 function saleOutstanding(s){return Math.max(0,Number(s.total||0)-saleCollected(s.id))}
@@ -954,6 +962,6 @@ function customerProfit(s){
     }).join('')
   }</table>`;
 }
-(async()=>{const {data:{session}}=await client.auth.getSession();if(session){currentUser=session.user;loginScreen.style.display='none';appShell.style.display='block';userEmail.textContent=session.user.email;try{await loadData();show('dashboard')}catch(e){alert('Veriler yüklenemedi: '+msg(e))}}})();
+(async()=>{const {data:{session}}=await client.auth.getSession();if(session){currentUser=session.user;loginScreen.style.display='none';appShell.style.display='block';userEmail.textContent=session.user.email;try{await loadData();show(savedPage())}catch(e){alert('Veriler yüklenemedi: '+msg(e))}}})();
 </script>
 </body></html>
