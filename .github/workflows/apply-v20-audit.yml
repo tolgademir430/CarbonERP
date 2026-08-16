@@ -4,6 +4,7 @@ on:
     paths:
       - 'scripts/stabilize_v20.py'
       - 'scripts/finalize_v20.py'
+      - 'scripts/harden_v20.py'
       - 'scripts/escape_embedded_script_tags.py'
       - 'scripts/validate_v20.py'
       - '.github/workflows/apply-v20-audit.yml'
@@ -24,16 +25,18 @@ jobs:
         run: python scripts/stabilize_v20.py
       - name: Apply final consistency pass
         run: python scripts/finalize_v20.py
+      - name: Apply hardening pass
+        run: python scripts/harden_v20.py
       - name: Validate HTML and JavaScript
         run: python scripts/validate_v20.py
       - name: Commit stabilized application
         run: |
           git config user.name 'carbonerp-bot'
           git config user.email 'actions@users.noreply.github.com'
-          git add index.html scripts/stabilize_v20.py scripts/finalize_v20.py scripts/escape_embedded_script_tags.py scripts/validate_v20.py .github/workflows/apply-v20-audit.yml
+          git add index.html scripts/stabilize_v20.py scripts/finalize_v20.py scripts/harden_v20.py scripts/escape_embedded_script_tags.py scripts/validate_v20.py .github/workflows/apply-v20-audit.yml
           if git diff --cached --quiet; then
             echo 'No changes to commit'
           else
-            git commit -m 'CarbonERP: finalize V20 consistency pass'
+            git commit -m 'CarbonERP: harden V20 reporting consistency'
             git push
           fi
