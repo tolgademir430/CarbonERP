@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/apply_v17_collection.py'
+      - '.github/workflows/apply-v17.yml'
 permissions:
   contents: write
 jobs:
