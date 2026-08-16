@@ -5,7 +5,37 @@ s=p.read_text(encoding='utf-8')
 start=s.find('function collectionSaleOptions(')
 end=s.find('function purchases(){', start)
 if start < 0 or end < 0: raise SystemExit('V17 collection markers not found')
-new=r'''function collectionSaleOptions(customerId, selectedSale=null){
+new=r'''async function repairLegacyGeneralCollections(){
+ // V17 öncesi kaydedilmiş "Cari genel" tahsilatları satışlara dağıt.
+ // Orijinal kayıt ilk satışa bağlanır; gerekirse kalan tutar yeni satış-bağlı
+ // tahsilat kayıtlarına bölünür. Böylece cari toplam değişmeden Vade Takibi
+ // ile satış bazındaki kalanlar da birbirini tutar.
+ const legacy=data.collections.filter(c=>!c.sale_id&&Number(c.amount||0)>0);
+ let changed=false;
+ for(const c of legacy){
+   let remaining=Number(c.amount||0);
+   const openSales=data.sales.filter(s=>s.customer_id===c.customer_id&&saleOutstanding(s)>0).sort((a,b)=>{
+     const ad=a.due_date||'9999-12-31',bd=b.due_date||'9999-12-31';
+     return ad.localeCompare(bd)||String(a.sale_date||'').localeCompare(String(b.sale_date||''));
+   });
+   for(let i=0;i<openSales.length&&remaining>0.0001;i++){
+     const sale=openSales[i];
+     const allocation=Math.min(remaining,saleOutstanding(sale));
+     if(allocation<=0)continue;
+     if(i===0){
+       const {error}=await client.from('collections').update({sale_id:sale.id,amount:Number(allocation.toFixed(2))}).eq('id',c.id);
+       if(error)throw error;
+     }else{
+       const {error}=await client.from('collections').insert({customer_id:c.customer_id,sale_id:sale.id,collection_date:c.collection_date,payment_type:c.payment_type,amount:Number(allocation.toFixed(2)),created_by:c.created_by});
+       if(error)throw error;
+     }
+     remaining-=allocation;
+     changed=true;
+   }
+ }
+ return changed;
+}
+function collectionSaleOptions(customerId, selectedSale=null){
  const arr=data.sales.filter(s=>s.customer_id===customerId&&saleOutstanding(s)>0);
  return `<option value="">Cari genel tahsilat (otomatik dağıt)</option>`+arr.map(s=>`<option value="${s.id}" ${s.id===selectedSale?'selected':''}>${s.sale_date} · ${money(s.total)} · kalan ${money(saleOutstanding(s))}${s.due_date?' · vade '+s.due_date:''}</option>`).join('');
 }
@@ -48,7 +78,6 @@ async function addCollection(){try{
    if(error)throw error;
  }else{
    // Cari genel tahsilatı FIFO mantığıyla en eski açık satıştan başlayarak dağıt.
-   // Böylece satış bazındaki kalan tutarlar ve Vade Takibi toplamı otomatik güncellenir.
    const openSales=data.sales.filter(s=>s.customer_id===id&&saleOutstanding(s)>0).sort((a,b)=>{
      const ad=a.due_date||'9999-12-31',bd=b.due_date||'9999-12-31';
      return ad.localeCompare(bd)||String(a.sale_date||'').localeCompare(String(b.sale_date||''));
@@ -71,6 +100,12 @@ async function addCollection(){try{
 }catch(e){alert(msg(e))}}
 '''
 s=s[:start]+new+s[end:]
+# Run the legacy repair after all data is loaded. It is idempotent because repaired
+# records now have sale_id and are no longer selected as legacy general collections.
+marker="  data.stockCost=data.stockMovements.reduce((a,m)=>a+Number(m.total_cost||0),0);"
+insert=marker+"\n  const repaired=await repairLegacyGeneralCollections();\n  if(repaired){const co2=await client.from('collections').select('*').order('collection_date');if(co2.error)throw co2.error;data.collections=co2.data||[];}"
+if marker not in s: raise SystemExit('loadData marker not found')
+s=s.replace(marker,insert,1)
 style='''<style id="carbonerp-v17-collection">.sale-fast-card{border:1px solid #d9e6dc;background:#f5fbf7;border-radius:10px;padding:12px}@media(max-width:600px){#modalbox .formgrid{grid-template-columns:1fr!important}#modalbox{padding:16px}.modalbox .actions .btn{flex:1}}</style>'''
 if 'id="carbonerp-v17-collection"' not in s:s=s.replace('</head>',style+'</head>')
 p.write_text(s,encoding='utf-8')
