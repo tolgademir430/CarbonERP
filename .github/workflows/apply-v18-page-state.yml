@@ -1,0 +1,26 @@
+name: CarbonERP V18 Page State
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/apply_v18_page_state.py'
+      - '.github/workflows/apply-v18-page-state.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Apply V18 page state
+        run: python3 scripts/apply_v18_page_state.py
+      - name: Commit updated app
+        run: |
+          git config user.name "CarbonERP Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet || git commit -m "CarbonERP: V18 preserve current page"
+          git pull --rebase origin main
+          git push
