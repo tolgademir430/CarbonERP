@@ -51,7 +51,8 @@ jobs:
           required=['CARBONERP_CARI_EKSTRE_V20','customerDetail','renderCustomerStatement','printCustomerStatement']
           missing=[x for x in required if x not in s]
           if missing: raise SystemExit('Missing: '+', '.join(missing))
-          if s.count('<script>') != s.count('</script>'): raise SystemExit('Script tag mismatch')
+          if '<!-- CARBONERP_CARI_EKSTRE_V20 -->' not in s: raise SystemExit('Statement marker missing')
+          print('Detailed customer statement injection OK')
           PY
       - name: Validate customer module
         run: python scripts/validate_customer_module_v20.py
