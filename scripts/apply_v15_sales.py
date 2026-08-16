@@ -86,6 +86,20 @@ style = r'''<style id="carbonerp-v15-sales">
 if 'id="carbonerp-v15-sales"' not in s:
     s=s.replace('</head>',style+'</head>')
 
+# Remove the older compact previewSale definition that appears later in the file.
+# Keeping two definitions caused the later one to overwrite the V15 version and
+# prevented the old/new cari balance from reacting to payment type.
+old_preview = '''function previewSale(){
+ let q=+s_kg.value||0,p=+s_price.value||0,vr=+s_vat.value||0;
+ let v=vatCalc(q*p,vr);
+ spBase.textContent=money(v.base);
+ spVat.textContent=money(v.vat);
+ spTotal.textContent=money(v.total);
+ spProfit.textContent='Brüt kâr: '+money(v.base-q*weightedCost())+' (KDV hariç)';
+}
+'''
+s = s.replace(old_preview, '', 1)
+
 # Critical HTML parser fix: a literal </script> inside a JS template string
 # terminates the enclosing script before JavaScript can finish parsing.
 main_start = s.find('<script>\nconst SUPABASE_URL')
@@ -96,4 +110,4 @@ if main_start >= 0 and main_end > main_start:
     s = s[:main_start] + js + s[main_end:]
 
 p.write_text(s,encoding='utf-8')
-print('V15 sales UI applied: peşin/vadeli cari preview and script-tag safety fix applied')
+print('V15 sales UI applied: peşin/vadeli cari preview, duplicate preview cleanup, and script-tag safety fix applied')
