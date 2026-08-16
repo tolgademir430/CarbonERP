@@ -119,7 +119,7 @@ async function login(){
 }
 async function logout(){await client.auth.signOut()}
 client.auth.onAuthStateChange(async (_event,session)=>{
- if(session){currentUser=session.user;loginScreen.style.display='none';appShell.style.display='block';userEmail.textContent=session.user.email;await loadData();await repairLegacyGeneralCollections();await loadData();show(savedPage())}
+ if(session){currentUser=session.user;loginScreen.style.display='none';appShell.style.display='block';userEmail.textContent=session.user.email;await loadData();show(savedPage())}
  else{currentUser=null;appShell.style.display='none';loginScreen.style.display='flex'}
 });
 
@@ -749,6 +749,45 @@ Tahsilat silinmeyecek; iptal olarak saklanacak.`))return;
   // make every unhandled UI error visible instead of silently failing.
   window.addEventListener('error',e=>console.error('CarbonERP:',e.error||e.message));
   window.addEventListener('unhandledrejection',e=>console.error('CarbonERP async:',e.reason));
+})();
+</script>
+<script>
+/* CARBONERP_V20_FINAL */
+(function(){
+ const activeSale=s=>!!s&&s.status!=='cancelled';
+ const activeCollection=c=>!!c&&c.status!=='cancelled';
+ const salesActive=()=> (data.sales||[]).filter(activeSale);
+ const collectionsActive=()=> (data.collections||[]).filter(activeCollection);
+ const saleCollected=id=>collectionsActive().filter(c=>c.sale_id===id).reduce((a,c)=>a+Number(c.amount||0),0);
+ const saleOutstanding=s=>activeSale(s)?Math.max(0,Number(s.total||0)-saleCollected(s.id)):0;
+ const qtyOf=s=>(s.sale_items||[]).reduce((a,i)=>a+Number(i.quantity||0),0);
+ window.saleCollected=saleCollected;
+ window.saleOutstanding=saleOutstanding;
+ window.customerBalance=id=>salesActive().filter(s=>s.customer_id===id).reduce((a,s)=>a+Number(s.total||0),0)-collectionsActive().filter(c=>c.customer_id===id).reduce((a,c)=>a+Number(c.amount||0),0);
+ window.totalReceivable=()=>salesActive().reduce((a,s)=>a+Number(s.total||0),0)-collectionsActive().reduce((a,c)=>a+Number(c.amount||0),0);
+ window.overdueSales=()=>salesActive().filter(s=>s.due_date&&saleOutstanding(s)>0&&s.due_date<today());
+ window.dueTodaySales=()=>salesActive().filter(s=>s.due_date===today()&&saleOutstanding(s)>0);
+ window.v16OpenSales=()=>salesActive().filter(s=>saleOutstanding(s)>0&&s.due_date);
+ window.monthlySummary=function(){
+  const map={}; salesActive().forEach(s=>{const k=String(s.sale_date||'').slice(0,7);if(!k)return;if(!map[k])map[k]={sales:0,cost:0,kg:0};map[k].sales+=Number(s.subtotal||0);map[k].cost+=Number(s.cost_total||0);map[k].kg+=qtyOf(s)});
+  return Object.keys(map).sort().slice(-6).map(k=>{const x=map[k],profit=x.sales-x.cost;return {k:k,sales:x.sales,cost:x.cost,kg:x.kg,profit:profit,margin:x.sales?profit/x.sales*100:0}});
+ };
+ window.salesPerformance=function(s){
+  s=s.filter(activeSale); if(!s.length)return '<div class="empty">Bu dönemde satış yok.</div>';
+  const kg=s.reduce((z,x)=>z+qtyOf(x),0),revenue=s.reduce((z,x)=>z+Number(x.subtotal||0),0),cost=s.reduce((z,x)=>z+Number(x.cost_total||0),0),profit=revenue-cost,avgKg=kg?revenue/kg:0,margin=revenue?profit/revenue*100:0;
+  return '<table><tr><th>Gösterge</th><th>Sonuç</th></tr><tr><td>Satış adedi</td><td>'+s.length+'</td></tr><tr><td>Satılan miktar</td><td>'+kg.toLocaleString('tr-TR')+' kg</td></tr><tr><td>Ortalama satış fiyatı</td><td>'+money(avgKg)+'/kg</td></tr><tr><td>Brüt kâr</td><td>'+money(profit)+'</td></tr><tr><td>Brüt kâr marjı</td><td>%'+margin.toFixed(1)+'</td></tr></table>';
+ };
+ window.customerProfit=function(s){
+  s=s.filter(activeSale); const ids=[...new Set(s.map(x=>x.customer_id))]; if(!ids.length)return '<div class="empty">Satış yok.</div>';
+  const rows=ids.map(id=>{const a=s.filter(x=>x.customer_id===id),kg=a.reduce((z,x)=>z+qtyOf(x),0),r=a.reduce((z,x)=>z+Number(x.subtotal||0),0),c=a.reduce((z,x)=>z+Number(x.cost_total||0),0),p=r-c,m=r?p/r*100:0;return '<tr><td>'+esc(customerName(id))+'</td><td>'+kg.toLocaleString('tr-TR')+'</td><td>'+money(r)+'</td><td>'+money(c)+'</td><td class="'+(p>=0?'positive':'danger')+'">'+money(p)+'</td><td>%'+m.toFixed(1)+'</td></tr>'}).join('');
+  return '<table><tr><th>Müşteri</th><th>Kg</th><th>Ciro (KDV hariç)</th><th>Maliyet</th><th>Brüt Kâr</th><th>Marj</th></tr>'+rows+'</table>';
+ };
+ window.customerTable=function(){
+  const cs=data.customers||[]; if(!cs.length)return '<div class="empty">Henüz müşteri yok.</div>';
+  const rows=cs.map(c=>{const ss=salesActive().filter(s=>s.customer_id===c.id),cc=collectionsActive().filter(x=>x.customer_id===c.id),s=ss.reduce((a,x)=>a+Number(x.total||0),0),p=cc.reduce((a,x)=>a+Number(x.amount||0),0),b=s-p;return '<tr><td>'+esc(c.name)+'</td><td>'+esc(c.phone||'')+'</td><td>'+money(s)+'</td><td>'+money(p)+'</td><td class="'+(b>0?'warning':'positive')+'">'+money(b)+'</td><td><button class="btn secondary" onclick="customerDetail(\''+c.id+'\')">Ekstre</button></td></tr>'}).join('');
+  return '<table><tr><th>Müşteri</th><th>Telefon</th><th>Satış</th><th>Tahsilat</th><th>Bakiye</th><th></th></tr>'+rows+'</table>';
+ };
+ window.repairLegacyGeneralCollections=async()=>false;
 })();
 </script>
 
