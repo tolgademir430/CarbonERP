@@ -7,6 +7,7 @@ on:
       - 'scripts/customer_legacy_cleanup_v20.py'
       - 'scripts/validate_customer_module_v20.py'
       - 'scripts/cari-ekstre-v20.js'
+      - 'scripts/customer-list-enhancement-v20.py'
       - '.github/workflows/customer-profile-v20.yml'
 permissions:
   contents: write
@@ -53,6 +54,18 @@ jobs:
               text=text.replace('</body>','<script>\n'+module+'\n</script>\n'+marker+'\n</body>',1)
           index.write_text(text,encoding='utf-8')
           PY
+      - name: Add customer search, numbering and total receivable V20
+        run: python scripts/customer-list-enhancement-v20.py
+      - name: Validate customer list enhancement
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('index.html').read_text(encoding='utf-8')
+          required=['customer-list-enhancement-v20','carbonerpCustomerSearch','Müşterilerden Toplam Alacak','textContent=String(i+1)']
+          missing=[x for x in required if x not in s]
+          if missing: raise SystemExit('Missing: '+', '.join(missing))
+          print('Customer list enhancement OK')
+          PY
       - name: Validate detailed statement injection
         run: |
           python3 - <<'PY'
@@ -70,5 +83,5 @@ jobs:
         run: |
           git config user.name 'carbonerp-bot'
           git config user.email 'actions@users.noreply.github.com'
-          git add index.html scripts/customer_module_clean_v20.py scripts/customer_legacy_cleanup_v20.py scripts/validate_customer_module_v20.py scripts/cari-ekstre-v20.js .github/workflows/customer-profile-v20.yml
-          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'CarbonERP: complete detailed customer statement'; git push; fi
+          git add index.html scripts/customer_module_clean_v20.py scripts/customer_legacy_cleanup_v20.py scripts/validate_customer_module_v20.py scripts/cari-ekstre-v20.js scripts/customer-list-enhancement-v20.py .github/workflows/customer-profile-v20.yml
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'CarbonERP: improve customer list'; git push; fi
