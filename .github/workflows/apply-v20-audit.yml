@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'scripts/apply_v20_audit.py'
+      - 'scripts/fix_v20_html.py'
       - '.github/workflows/apply-v20-audit.yml'
   workflow_dispatch:
 permissions:
@@ -16,11 +17,13 @@ jobs:
         with:
           python-version: '3.x'
       - name: Apply V20 patch
-        run: python scripts/apply_v20_audit.py
+        run: |
+          python scripts/apply_v20_audit.py
+          python scripts/fix_v20_html.py
       - name: Commit V20
         run: |
           git config user.name 'carbonerp-bot'
           git config user.email 'actions@users.noreply.github.com'
-          git add index.html scripts/apply_v20_audit.py .github/workflows/apply-v20-audit.yml
+          git add index.html scripts/apply_v20_audit.py scripts/fix_v20_html.py .github/workflows/apply-v20-audit.yml
           git diff --cached --quiet || git commit -m 'CarbonERP: V20 full audit and safe transaction model'
           git push
