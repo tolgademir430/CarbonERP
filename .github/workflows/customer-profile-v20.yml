@@ -26,6 +26,16 @@ jobs:
         run: python scripts/customer_legacy_cleanup_v20.py
       - name: Build clean customer module
         run: python scripts/customer_module_clean_v20.py
+      - name: Make generated print HTML validator-safe
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace("'<script>", "'<scr'+'ipt>")
+          s=s.replace("</script>'", "</scr'+'ipt>'")
+          p.write_text(s,encoding='utf-8')
+          PY
       - name: Inject detailed customer statement V20
         run: |
           python3 - <<'PY'
