@@ -1,29 +1,33 @@
-name: Apply V20 audit patch
+name: CarbonERP V20 stabilization
 on:
   push:
     paths:
-      - 'scripts/apply_v20_audit.py'
-      - 'scripts/fix_v20_html.py'
+      - 'scripts/stabilize_v20.py'
+      - 'scripts/validate_v20.py'
       - '.github/workflows/apply-v20-audit.yml'
   workflow_dispatch:
 permissions:
   contents: write
 jobs:
-  apply:
+  stabilize:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-      - name: Apply V20 patch
-        run: |
-          python scripts/apply_v20_audit.py
-          python scripts/fix_v20_html.py
-      - name: Commit V20
+      - name: Apply deterministic cleanup
+        run: python scripts/stabilize_v20.py
+      - name: Validate HTML and JavaScript
+        run: python scripts/validate_v20.py
+      - name: Commit stabilized application
         run: |
           git config user.name 'carbonerp-bot'
           git config user.email 'actions@users.noreply.github.com'
-          git add index.html scripts/apply_v20_audit.py scripts/fix_v20_html.py .github/workflows/apply-v20-audit.yml
-          git diff --cached --quiet || git commit -m 'CarbonERP: V20 full audit and safe transaction model'
-          git push
+          git add index.html scripts/stabilize_v20.py scripts/validate_v20.py .github/workflows/apply-v20-audit.yml
+          if git diff --cached --quiet; then
+            echo 'No changes to commit'
+          else
+            git commit -m 'CarbonERP: stabilize V20 and validate application'
+            git push
+          fi
