@@ -6,11 +6,10 @@ errors=[]
 if len(blocks)!=1: errors.append(f'customer module count={len(blocks)}')
 else:
     js=blocks[0]
-    # The customer module contains generated print HTML. Literal <script> tags
-    # inside JavaScript strings confuse the simple block extractor above, so
-    # normalize those string fragments only for syntax checking.
+    # The module builds printable HTML containing literal script tags inside
+    # JavaScript strings. Normalize those literals only for syntax checking.
     js=js.replace("'<script>", "'<scr'+'ipt>")
-    js=js.replace("</script>'", "</scr'+'ipt>'")
+    js=js.replace('</script>', "</scr'+'ipt>")
     with tempfile.NamedTemporaryFile('w',suffix='.js',encoding='utf-8',delete=False) as f:
         f.write(js); name=f.name
     r=subprocess.run(['node','--check',name],capture_output=True,text=True)
