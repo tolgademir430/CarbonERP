@@ -17,8 +17,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Inject customer special price behavior
-        shell: python
+        shell: bash
         run: |
+          python - <<'PY'
           from pathlib import Path
           p = Path('index.html')
           s = p.read_text(encoding='utf-8')
@@ -120,9 +121,10 @@ jobs:
           </script>'''
           s = s.replace('</body>', module + '\n</body>')
           p.write_text(s, encoding='utf-8')
+          PY
 
       - name: Validate injected module
-        shell: python
+        shell: bash
         run: |
           test -f index.html
           python - <<'PY'
