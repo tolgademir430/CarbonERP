@@ -16,10 +16,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-      - name: Restore validated V20 application base
+      - name: Restore V20 application base
         run: |
-          git fetch --no-tags origin 778ef55df18df9cae62bd33e9fcd70870d614b9c --depth=1
-          git show 778ef55df18df9cae62bd33e9fcd70870d614b9c:index.html > index.html
+          git fetch --no-tags origin 2771fdf1e7c5bc1b6622384e41090690121ba06f --depth=1
+          git show 2771fdf1e7c5bc1b6622384e41090690121ba06f:index.html > index.html
       - name: Remove legacy nested print scripts
         run: python scripts/customer_legacy_cleanup_v20.py
       - name: Build clean customer module
