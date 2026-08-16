@@ -121,19 +121,26 @@ jobs:
           s = s.replace('</body>', module + '\n</body>')
           p.write_text(s, encoding='utf-8')
 
-      - name: Validate
+      - name: Validate injected module
+        shell: python
         run: |
           test -f index.html
-          grep -q 'carbonerp-customer-special-price-v20' index.html
-          grep -q 'special_price' index.html
-          node --check <(python - <<'PY'
+          python - <<'PY'
           from pathlib import Path
-          import re
           s=Path('index.html').read_text(encoding='utf-8')
-          blocks=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S|re.I)
-          print('\n'.join(blocks))
+          marker='<script id="carbonerp-customer-special-price-v20">'
+          start=s.find(marker)
+          if start < 0: raise SystemExit('special price module missing')
+          start += len(marker)
+          end=s.find('</script>', start)
+          if end < 0: raise SystemExit('special price script closing tag missing')
+          js=s[start:end]
+          Path('/tmp/carbonerp-special-price.js').write_text(js,encoding='utf-8')
+          if 'special_price' not in js or 'findCustomerSelect' not in js or 'findPriceInput' not in js:
+              raise SystemExit('special price module content incomplete')
           PY
-          )
+          node --check /tmp/carbonerp-special-price.js
+          grep -q 'carbonerp-customer-special-price-v20' index.html
 
       - name: Commit generated change
         run: |
