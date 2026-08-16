@@ -183,7 +183,7 @@ function printCustomerStatement(customerId){
 @media(max-width:600px){.formgrid{grid-template-columns:1fr!important}.actions .btn{flex:1}.panel{padding:14px}}
 </style>
 </head><body><h1>CarbonERP - Cari Ekstre</h1><div><b>Müşteri:</b> ${esc(c.name||'')}</div><table><tr><th>Tarih</th><th>İşlem</th><th>Belge</th><th>İşlem Tutarı</th><th>Kalan</th></tr>${rows||'<tr><td colspan="5">Kayıt yok</td></tr>'}</table><div class="total">Toplam Açık Bakiye: ${money(sales.reduce((a,s)=>a+saleOutstanding(s),0))}</div><script>window.onload=()=>window.print()<\/script><script src="sales-fix.js"><\/script>
-<script src="sales-fix.js"></script>
+<script src="sales-fix.js"><\/script>
 </body></html>`);
   w.document.close();
 }
@@ -256,11 +256,11 @@ function sales(){
      <div class="field"><label>Tarih</label><input id="s_date" type="date" value="${today()}"></div>
      <div class="field"><label>Ürün</label><select id="s_product">${product?`<option value="${product.id}">${esc(product.name||'Mangal Kömürü')}</option>`:'<option value="">Ürün seçin</option>'}</select></div>
      <div class="field"><label>KDV Oranı (%)</label><select id="s_vat" onchange="previewSale()">${vatOptions(20)}</select></div>
-     <div class="field"><label>Ödeme</label><select id="s_payment" onchange="toggleSaleDue()"><option>Peşin</option><option>Havale/EFT</option><option>Kredi Kartı</option><option>Vadeli</option></select></div>
+     <div class="field"><label>Ödeme</label><select id="s_payment" onchange="previewSale()"><option>Peşin</option><option>Havale/EFT</option><option>Kredi Kartı</option><option>Vadeli</option></select></div>
      <div class="field" id="dueWrap" style="display:none;grid-column:1/-1"><label>Vade Tarihi</label><input id="s_due" type="date"></div>
     </div>
    </div>
-   <div class="panel" style="margin-top:18px"><h2>Özet</h2><div>Net (KDV Hariç): <b id="spBase">${money(5000)}</b></div><div style="margin-top:8px">KDV: <b id="spVat">${money(1000)}</b></div><hr><div class="value" id="spTotal">${money(6000)}</div><div class="positive" id="spProfit" style="margin-top:8px"></div><div class="status">Eski bakiye: <b id="spOldBalance">${money(c0?customerBalance(c0.id):0)}</b></div><div class="status">Yeni bakiye: <b id="spNewBalance">${money(c0?customerBalance(c0.id)+6000:6000)}</b></div></div>
+   <div class="panel" style="margin-top:18px"><h2>Özet</h2><div>Net (KDV Hariç): <b id="spBase">${money(5000)}</b></div><div style="margin-top:8px">KDV: <b id="spVat">${money(1000)}</b></div><hr><div class="value" id="spTotal">${money(6000)}</div><div class="positive" id="spProfit" style="margin-top:8px"></div><div class="status">Eski bakiye: <b id="spOldBalance">${money(c0?customerBalance(c0.id):0)}</b></div><div class="status">Yeni bakiye: <b id="spNewBalance">${money(c0?customerBalance(c0.id):0)}</b></div></div>
   </div>
  </div>
  <div class="panel" style="margin-top:18px"><div class="actions" style="justify-content:flex-start;margin-top:0"><label style="display:flex;align-items:center;gap:8px"><input id="s_make_note" type="checkbox" checked> İrsaliye oluştur</label><button class="btn secondary" onclick="clearSaleForm()">Temizle</button><button class="btn primary" onclick="saveSale()">Satışı Kaydet</button></div></div>
@@ -272,6 +272,26 @@ function updateSaleCustomerInfo(){const el=document.getElementById('saleCustomer
 function setSaleKg(q){const el=document.getElementById('s_kg');if(el){el.value=q;previewSale()}}
 function toggleSaleDue(){const p=document.getElementById('s_payment'),w=document.getElementById('dueWrap');if(w&&p)w.style.display=p.value==='Vadeli'?'block':'none'}
 function clearSaleForm(){['s_customer_search','s_kg','s_price','s_due'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=id==='s_kg'?'100':id==='s_price'?'50':''});const p=document.getElementById('s_payment');if(p)p.value='Peşin';toggleSaleDue();previewSale()}
+function previewSale(){
+ const q=Number(document.getElementById('s_kg')?.value||0);
+ const p=Number(document.getElementById('s_price')?.value||0);
+ const vr=Number(document.getElementById('s_vat')?.value||0);
+ const payment=document.getElementById('s_payment')?.value||'Peşin';
+ const customerId=document.getElementById('s_customer')?.value;
+ const base=q*p, vat=base*vr/100, total=base+vat;
+ const oldBalance=customerId ? Number(customerBalance(customerId)||0) : 0;
+ const newBalance=payment==='Vadeli' ? oldBalance+total : oldBalance;
+ const cost=q*Number(weightedCost()||0);
+ const profit=base-cost;
+ const set=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text};
+ set('spBase',money(base));
+ set('spVat',money(vat));
+ set('spTotal',money(total));
+ set('spProfit','Brüt kâr: '+money(profit)+' (KDV hariç)');
+ set('spOldBalance',money(oldBalance));
+ set('spNewBalance',money(newBalance));
+ toggleSaleDue();
+}
 function recentSalesTable(){const rows=[...(data.sales||[])].sort((a,b)=>String(b.sale_date).localeCompare(String(a.sale_date))).slice(0,20);if(!rows.length)return '<div class="empty">Henüz satış yok.</div>';return `<table><tr><th>Tarih</th><th>Müşteri</th><th>Tutar</th><th>Ödeme</th><th></th></tr>${rows.map(s=>`<tr><td>${esc(s.sale_date)}</td><td>${esc(customerName(s.customer_id))}</td><td>${money(s.total)}</td><td>${esc(s.payment_type||'')}</td><td><button class="btn secondary" onclick="printDeliveryNote('${s.id}')">🧾 İrsaliye</button></td></tr>`).join('')}</table>`}
 function printDeliveryNote(saleId){const s=(data.sales||[]).find(x=>x.id===saleId);if(!s)return alert('Satış bulunamadı.');const c=(data.customers||[]).find(x=>x.id===s.customer_id)||{};const items=s.sale_items||[];const qty=items.reduce((a,x)=>a+Number(x.quantity||0),0);const w=window.open('','_blank');if(!w)return;const no=String(s.id).slice(0,8).toUpperCase();w.document.write(`<html><head><title>İrsaliye ${no}</title><style>@page{size:A4;margin:15mm}body{font-family:Arial,sans-serif;color:#111}.delivery-note h1{font-size:24px;margin:0 0 6px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0}.meta div{border:1px solid #ddd;padding:8px}.delivery-note table{width:100%;border-collapse:collapse;margin-top:18px}.delivery-note th,.delivery-note td{border:1px solid #bbb;padding:9px}.total{text-align:right;margin-top:16px;font-weight:bold}.sign{display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:70px}.line{border-top:1px solid #999;padding-top:7px;text-align:center}</style><style id="carbonerp-v15-sales">
 .sale-fast-card{border:1px solid #d9e6dc;background:#f5fbf7;border-radius:10px;padding:12px}
