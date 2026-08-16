@@ -1,0 +1,20 @@
+from pathlib import Path
+import re, subprocess, tempfile
+s=Path('index.html').read_text(encoding='utf-8')
+blocks=re.findall(r'<script id="carbonerp-v20-customer-module">(.*?)</script>',s,flags=re.S|re.I)
+errors=[]
+if len(blocks)!=1: errors.append(f'customer module count={len(blocks)}')
+else:
+    js=blocks[0]
+    with tempfile.NamedTemporaryFile('w',suffix='.js',encoding='utf-8',delete=False) as f:
+        f.write(js); name=f.name
+    r=subprocess.run(['node','--check',name],capture_output=True,text=True)
+    if r.returncode: errors.append(r.stderr.strip())
+for marker in ['customerTable','customerDetail','customerEdit','saveCustomerEdit','openCustomer','saveCustomerClean','printCustomerStatement']:
+    if marker not in s: errors.append('missing '+marker)
+required=['customer_code','contact_person','customer_type','alternate_phone','whatsapp','invoice_title','delivery_address','credit_limit','discount_rate','special_price','minimum_order_kg']
+for field in required:
+    if field not in s: errors.append('missing field '+field)
+if errors:
+    print('\n'.join('ERROR: '+e for e in errors)); raise SystemExit(1)
+print('CarbonERP customer module validation passed')
