@@ -1,27 +1,52 @@
 # CarbonERP Mobile
 
-CarbonERP mobil uygulaması için başlangıç klasörü.
+CarbonERP'nin mobil operasyon uygulaması. Web yönetim paneli ile aynı Supabase veritabanını kullanır.
 
 ## Mimari
 
-- React Native + Expo
+- React Native + Expo + Expo Router
 - Supabase Auth + RLS
-- Aynı CarbonERP veritabanı
-- Kritik finans/stok işlemleri güvenli backend katmanından
-- İlk hedef Android ve iOS
-- Mobil ekranlar saha kullanımına göre sade ve hızlı olacak
+- Publishable key ile istemci bağlantısı
+- Kritik satış, iade, teslimat ve stok işlemleri `secure-rpc` Edge Function üzerinden
+- Offline çalışma yok: internet/Supabase bağlantısı olmadan işletme işlemleri yapılmaz
+- Android ve iOS hedeflenir
 
-## İlk sürüm
+## Mobil özellikler
 
-1. Giriş / oturum
-2. Ana panel
-3. Müşteri listesi ve cari kart
-4. Ürünler ve stok
-5. Yeni satış
-6. Tahsilat
-7. Stok sayımı / mevcut stok girişi
-8. Sipariş takibi
-9. Barkod okuma için altyapı
-10. Offline senkronizasyon için mimari hazırlık
+- Güvenli giriş ve oturum yenileme
+- Ana panel ve hızlı işlem kartları
+- Müşteri arama, müşteri oluşturma ve cari kart görüntüleme
+- Ürün arama, stok/fiyat görüntüleme ve ürün oluşturma
+- Yeni satış oluşturma
+- Satış geçmişi
+- Tahsilat geçmişi ve yeni tahsilat
+- Stok sayımı ve maliyetli mevcut stok girişi
+- Teslimat/sipariş görünümü
+- Mobil rapor özeti
+- Çıkış ve oturum yönetimi
 
-Web uygulaması yönetim merkezi olarak kalacak; mobil uygulama operasyon merkezi olacak.
+## Kurulum
+
+```bash
+cd mobile
+npm install
+npx expo start
+```
+
+`.env` içinde:
+
+```text
+EXPO_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
+```
+
+Telefonunda Expo Go ile QR kodu okutabilir veya Android Studio/emülatör ile çalıştırabilirsin.
+
+## Güvenlik
+
+Service-role key mobil uygulamaya konulmaz. Kritik işlemler JWT ile doğrulanan `secure-rpc` fonksiyonundan geçer ve yalnızca yetkili admin hesabı için izin verilir. RLS veritabanı katmanında aktiftir.
+
+## Bilinçli kapsam dışı
+
+- Offline veri/senkronizasyon yok.
+- Fiziksel cihaz üzerinde bu ortamdan Android/iOS derlemesi çalıştırılamadı; son doğrulama yerel Expo/Android Studio veya Expo Go üzerinde yapılmalıdır.
