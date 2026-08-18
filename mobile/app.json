@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "CarbonERP Mobile",
+    "slug": "carbonerp-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "carbonerp",
+    "userInterfaceStyle": "light",
+    "ios": { "supportsTablet": true },
+    "android": { "package": "com.carbonerp.mobile" },
+    "plugins": ["expo-router"]
+  }
+}
